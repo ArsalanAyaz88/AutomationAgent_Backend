@@ -17,11 +17,23 @@ class YouTubeHttpClient:
 
     async def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
         url = f"{self.base_url}{path}"
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            payload = response.json()
-            return payload.get("data", payload)
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            # Surface API error details for easier debugging.
+            content = exc.response.text
+            raise RuntimeError(
+                f"YouTube HTTP wrapper returned {exc.response.status_code}: {content}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise RuntimeError(
+                f"Failed to contact YouTube HTTP wrapper at {url}: {exc}"
+            ) from exc
+
+        payload = response.json()
+        return payload.get("data", payload)
 
     async def health(self) -> Dict[str, Any]:
         return await self._get("/health")

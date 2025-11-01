@@ -30,6 +30,15 @@ async def videos_getVideo(
 
 
 @function_tool
+async def videos_getVideoStats(
+    videoId: Annotated[str, "The YouTube video ID"],
+) -> str:
+    client = _get_client()
+    data = await client.get_video_stats(videoId)
+    return _to_text(data)
+
+
+@function_tool
 async def videos_searchVideos(
     query: Annotated[str, "Search query string"],
     maxResults: Annotated[Optional[int], "Maximum number of results"] = None,
@@ -89,6 +98,7 @@ async def playlists_getPlaylistItems(
 
 YOUTUBE_TOOLS = [
     videos_getVideo,
+    videos_getVideoStats,
     videos_searchVideos,
     transcripts_getTranscript,
     channels_getChannel,
