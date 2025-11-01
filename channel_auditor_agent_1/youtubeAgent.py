@@ -44,14 +44,19 @@ set_default_openai_api("chat_completions")
 set_tracing_disabled(disabled=True)
 
 
+# YouTube API Key
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY") or "AIzaSyCLYYXRFmXRaPxav_u806d8nnJF6pQKb6U"
+
+
 async def main():
     async with MCPServerStdio(
         name="youtube",
         params={
-            "command": "node",
-            "args": ["./youtube-mcp-server/dist/cli.js"],
-            "env": {"YOUTUBE_API_KEY": os.getenv("YOUTUBE_API_KEY")},
+            "command": "npx",
+            "args": ["-y", "youtube-mcp-server-by-arsalan"],
+            "env": {"YOUTUBE_API_KEY": YOUTUBE_API_KEY},
         },
+        client_session_timeout_seconds=30,
     ) as youtube_server:
         agent = Agent(
             name="YouTube Assistant",
