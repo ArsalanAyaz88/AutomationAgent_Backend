@@ -162,10 +162,11 @@ async def audit_channel(request: ChannelAuditRequest):
         async with MCPServerStdio(
             name="youtube",
             params={
-                "command": "node",
-                "args": ["./channel_auditor_agent_1/youtube-mcp-server/dist/cli.js"],
+                "command": "npx",
+                "args": ["youtube-mcp-server-by-arsalan"],
                 "env": {"YOUTUBE_API_KEY": os.getenv("YOUTUBE_API_KEY")},
             },
+            client_session_timeout_seconds=30,
         ) as youtube_server:
             agent = Agent(
                 name="YouTube Channel Auditor",
@@ -265,10 +266,11 @@ async def audit_titles(request: TitleAuditRequest):
         async with MCPServerStdio(
             name="youtube",
             params={
-                "command": "node",
-                "args": ["./channel_auditor_agent_1/youtube-mcp-server/dist/cli.js"],
+                "command": "npx",
+                "args": ["-y", "youtube-mcp-server-by-arsalan"],
                 "env": {"YOUTUBE_API_KEY": os.getenv("YOUTUBE_API_KEY")},
             },
+            client_session_timeout_seconds=30,
         ) as youtube_server:
             agent = Agent(
                 name="Title & Thumbnail Auditor",
