@@ -16,7 +16,7 @@ from agents import (
     set_default_openai_client,
     set_tracing_disabled,
 )
-from agents.mcp import MCPServerStdio
+from youtube_tools import YOUTUBE_TOOLS
 
 # Load environment variables
 load_dotenv()
@@ -159,18 +159,9 @@ async def audit_channel(request: ChannelAuditRequest):
             # Pure conversation mode
             query = request.user_query
         
-        async with MCPServerStdio(
-            name="youtube",
-            params={
-                "command": "npx",
-                "args": ["youtube-mcp-server-by-arsalan"],
-                "env": {"YOUTUBE_API_KEY": os.getenv("YOUTUBE_API_KEY")},
-            },
-            client_session_timeout_seconds=30,
-        ) as youtube_server:
-            agent = Agent(
-                name="YouTube Channel Auditor",
-                instructions="""You are a friendly and expert YouTube channel auditor. 
+        agent = Agent(
+            name="YouTube Channel Auditor",
+            instructions="""You are a friendly and expert YouTube channel auditor. 
 
 🎯 YOUR CORE CAPABILITIES:
 1. Analyze YouTube channels in depth
@@ -239,12 +230,12 @@ E. GENERAL QUESTIONS:
 - Competitive positioning
 
 Remember: You're helping users understand YouTube better. Be conversational, insightful, and always provide actionable advice!""",
-                model=model_name,
-                mcp_servers=[youtube_server]
-            )
-            
-            result = await Runner.run(agent, query)
-            return AgentResponse(success=True, result=result.final_output)
+            model=model_name,
+            tools=YOUTUBE_TOOLS
+        )
+        
+        result = await Runner.run(agent, query)
+        return AgentResponse(success=True, result=result.final_output)
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -263,28 +254,21 @@ async def audit_titles(request: TitleAuditRequest):
         query = f"{request.user_query}\n\nVideos to analyze:\n"
         query += "\n".join([f"- {url}" for url in request.video_urls])
         
-        async with MCPServerStdio(
-            name="youtube",
-            params={
-                "command": "npx",
-                "args": ["-y", "youtube-mcp-server-by-arsalan"],
-                "env": {"YOUTUBE_API_KEY": os.getenv("YOUTUBE_API_KEY")},
-            },
-            client_session_timeout_seconds=30,
-        ) as youtube_server:
-            agent = Agent(
-                name="Title & Thumbnail Auditor",
-                instructions="""You are an expert at analyzing YouTube video performance patterns. Your job is to:
-                1. Analyze video titles for their structure, formulas, and patterns
-                2. Identify what makes titles perform well (numbers, questions, power words)
-                3. Evaluate thumbnail characteristics (text placement, colors, faces, contrast)
-                4. Extract keyword placement strategies
+        agent = Agent(
+            name="Title & Thumbnail Auditor",
+            instructions="""You are an expert at analyzing YouTube video performance patterns. Your job is to:
+            1. Analyze video titles for their structure, formulas, and patterns
+            2. Identify what makes titles perform well (numbers, questions, power words)
+            3. Evaluate thumbnail characteristics (text placement, colors, faces, contrast)
+            4. Extract keyword placement strategies
+            5. Analyze hook effectiveness in the first 10 seconds
+            6. Identify the "winning formula" across top performers
                 5. Analyze hook effectiveness in the first 10 seconds
                 6. Identify the "winning formula" across top performers
                 
                 Provide detailed breakdowns of each element with examples and patterns.""",
                 model=model_name,
-                mcp_servers=[youtube_server]
+                tools=YOUTUBE_TOOLS
             )
             
             result = await Runner.run(agent, query)

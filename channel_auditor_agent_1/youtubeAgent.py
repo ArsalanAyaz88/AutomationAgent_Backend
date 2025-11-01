@@ -8,12 +8,11 @@ load_dotenv()
 from agents import (
     Agent,
     Runner,
-    function_tool,
     set_default_openai_api,
     set_default_openai_client,
     set_tracing_disabled,
 )
-from agents.mcp import MCPServerStdio
+from youtube_tools import YOUTUBE_TOOLS
 
 BASE_URL = os.getenv("GEMINI_BASE_URL") or ""
 API_KEY = os.getenv("GEMINI_API_KEY") or ""
@@ -44,23 +43,10 @@ set_default_openai_api("chat_completions")
 set_tracing_disabled(disabled=True)
 
 
-# YouTube API Key
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY") or "AIzaSyCLYYXRFmXRaPxav_u806d8nnJF6pQKb6U"
-
-
 async def main():
-    async with MCPServerStdio(
-        name="youtube",
-        params={
-            "command": "npx",
-            "args": ["-y", "youtube-mcp-server-by-arsalan"],
-            "env": {"YOUTUBE_API_KEY": YOUTUBE_API_KEY},
-        },
-        client_session_timeout_seconds=30,
-    ) as youtube_server:
-        agent = Agent(
-            name="YouTube Assistant",
-            instructions="""You are a helpful YouTube assistant with access to YouTube data.
+    agent = Agent(
+        name="YouTube Assistant",
+        instructions="""You are a helpful YouTube assistant with access to YouTube data.
             You can help users with:
             - Getting video information and details
             - Searching for videos
@@ -117,64 +103,64 @@ async def main():
             
             Always provide detailed and helpful responses with complete information.""",
             model=MODEL_NAME,
-            mcp_servers=[youtube_server]
+            tools=YOUTUBE_TOOLS
         )
 
-        print("\n=== YouTube Agent ===")
-        print("Available commands:")
-        print("  - Get video information by video ID")
-        print("  - Search for videos")
-        print("  - Get video transcripts")
-        print("  - Get channel information")
-        print("  - List videos from a channel")
-        print("  - Get playlist information")
-        print("  - Calculate channel analytics (avg duration, upload frequency, avg views)")
-        print("\nType 'samples' to see example prompts")
-        print("Type 'exit' to quit\n")
-        
-        while True:
-            try:
-                user_input = input("You: ").strip()
+    print("\n=== YouTube Agent ===")
+    print("Available commands:")
+    print("  - Get video information by video ID")
+    print("  - Search for videos")
+    print("  - Get video transcripts")
+    print("  - Get channel information")
+    print("  - List videos from a channel")
+    print("  - Get playlist information")
+    print("  - Calculate channel analytics (avg duration, upload frequency, avg views)")
+    print("\nType 'samples' to see example prompts")
+    print("Type 'exit' to quit\n")
+    
+    while True:
+        try:
+            user_input = input("You: ").strip()
+            
+            if not user_input:
+                continue
                 
-                if not user_input:
-                    continue
-                    
-                if user_input.lower() in ['exit', 'quit', 'bye']:
-                    print("Goodbye!")
-                    break
-                
-                if user_input.lower() == 'samples':
-                    print("\n📝 Sample Prompts:")
-                    print("1. Get video details:")
-                    print("   'Get information about video dQw4w9WgXcQ'")
-                    print("\n2. Search videos:")
-                    print("   'Search for Python tutorial videos'")
-                    print("\n3. Get transcript:")
-                    print("   'Get the transcript for video dQw4w9WgXcQ'")
-                    print("\n4. Channel info:")
-                    print("   'Get information about channel UC8butISFwT-Wl7EV0hUK0BQ'")
-                    print("\n5. List channel videos:")
-                    print("   'List recent videos from channel UC8butISFwT-Wl7EV0hUK0BQ'")
-                    print("\n6. Playlist info:")
-                    print("   'Get playlist PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf'")
-                    print("\n7. Analytics - Average Duration:")
-                    print("   'What is the average video duration for channel UC8butISFwT-Wl7EV0hUK0BQ?'")
-                    print("\n8. Analytics - Upload Frequency:")
-                    print("   'How often does channel UC8butISFwT-Wl7EV0hUK0BQ upload videos?'")
-                    print("\n9. Analytics - Average Views:")
-                    print("   'What is the average views per video for channel UC8butISFwT-Wl7EV0hUK0BQ?'")
-                    print("\nType 'exit' to quit\n")
-                    continue
-                
-                print("\n🤔 Thinking...")
-                result = await Runner.run(agent, user_input)
-                print(f"\n🤖 Assistant: {result.final_output}\n")
-                
-            except KeyboardInterrupt:
-                print("\n\nGoodbye!")
+            if user_input.lower() in ['exit', 'quit', 'bye']:
+                print("Goodbye!")
                 break
-            except Exception as e:
-                print(f"\n❌ Error: {str(e)}\n")
+            
+            if user_input.lower() == 'samples':
+                print("\n📝 Sample Prompts:")
+                print("1. Get video details:")
+                print("   'Get information about video dQw4w9WgXcQ'")
+                print("\n2. Search videos:")
+                print("   'Search for Python tutorial videos'")
+                print("\n3. Get transcript:")
+                print("   'Get the transcript for video dQw4w9WgXcQ'")
+                print("\n4. Channel info:")
+                print("   'Get information about channel UC8butISFwT-Wl7EV0hUK0BQ'")
+                print("\n5. List channel videos:")
+                print("   'List recent videos from channel UC8butISFwT-Wl7EV0hUK0BQ'")
+                print("\n6. Playlist info:")
+                print("   'Get playlist PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf'")
+                print("\n7. Analytics - Average Duration:")
+                print("   'What is the average video duration for channel UC8butISFwT-Wl7EV0hUK0BQ?'")
+                print("\n8. Analytics - Upload Frequency:")
+                print("   'How often does channel UC8butISFwT-Wl7EV0hUK0BQ upload videos?'")
+                print("\n9. Analytics - Average Views:")
+                print("   'What is the average views per video for channel UC8butISFwT-Wl7EV0hUK0BQ?'")
+                print("\nType 'exit' to quit\n")
+                continue
+            
+            print("\n🤔 Thinking...")
+            result = await Runner.run(agent, user_input)
+            print(f"\n🤖 Assistant: {result.final_output}\n")
+            
+        except KeyboardInterrupt:
+            print("\n\nGoodbye!")
+            break
+        except Exception as e:
+            print(f"\n❌ Error: {str(e)}\n")
 
 
 if __name__ == "__main__":
