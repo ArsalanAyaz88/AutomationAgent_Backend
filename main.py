@@ -263,16 +263,14 @@ async def audit_titles(request: TitleAuditRequest):
             4. Extract keyword placement strategies
             5. Analyze hook effectiveness in the first 10 seconds
             6. Identify the "winning formula" across top performers
-                5. Analyze hook effectiveness in the first 10 seconds
-                6. Identify the "winning formula" across top performers
-                
-                Provide detailed breakdowns of each element with examples and patterns.""",
-                model=model_name,
-                tools=YOUTUBE_TOOLS
-            )
-            
-            result = await Runner.run(agent, query)
-            return AgentResponse(success=True, result=result.final_output)
+
+            Provide detailed breakdowns of each element with examples and patterns.""",
+            model=model_name,
+            tools=YOUTUBE_TOOLS
+        )
+        
+        result = await Runner.run(agent, query)
+        return AgentResponse(success=True, result=result.final_output)
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
