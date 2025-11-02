@@ -38,7 +38,7 @@ def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
 SCENE BREAKDOWN FRAMEWORK:
 
 For each scene provide:
-1. TIMESTAMP: Start-end time
+1. TIMESTAMP: Start-end time — each scene must be exactly 8 seconds long (no more, no less)
 2. VOICEOVER/DIALOGUE: Script text for this scene
 3. SHOT BREAKDOWN: Shot type, camera angle, movement, subject, background
 4. LIGHTING SETUP: Style, key/fill/back lights, mood, color temperature
@@ -86,7 +86,7 @@ Create a complete execution plan covering all scenes with timing, shots, lightin
             critic_instructions = f"""You are a Critic LLM. Review the scene breakdown plan below and identify:
 
 1. COMPLETENESS: Are ALL parts of the script covered?
-2. TIMING ACCURACY: Are timestamps realistic?
+2. TIMING ACCURACY: Does every scene span exactly 8 seconds between start and end timestamps?
 3. CONSISTENCY: Is visual style uniform across scenes?
 4. MISSING ELEMENTS: Any missing shots, lighting, transitions, or AI prompts?
 5. TECHNICAL QUALITY: Are AI prompts generation-ready?
@@ -131,7 +131,7 @@ Critic's Feedback:
 {critique}
 
 Task: Create a REFINED, COMPLETE scene breakdown that addresses all issues raised by the Critic. 
-Ensure every scene has complete details (timestamp, dialogue, shots, lighting, mood, transitions, AI prompts). 
+Ensure every scene is exactly 8 seconds long and has complete details (timestamp, dialogue, shots, lighting, mood, transitions, AI prompts). 
 Output only the final polished breakdown."""
             
             refined_planner_agent = Agent(
