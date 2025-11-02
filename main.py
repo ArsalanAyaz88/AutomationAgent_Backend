@@ -1,11 +1,17 @@
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
 
+import certifi
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
 
 from openai import AsyncOpenAI
 from agents import (
@@ -18,6 +24,24 @@ from agents import (
 from youtube_tools import YOUTUBE_TOOLS
 # Load environment variables
 load_dotenv()
+
+# MongoDB configuration for saved responses
+MONGODB_URI = os.getenv("MONGODB_URI")
+MONGODB_DB = os.getenv("MONGODB_DB", "youtube_ops")
+SAVED_RESPONSES_COLLECTION = os.getenv("SAVED_RESPONSES_COLLECTION", "saved_responses")
+MONGODB_CA_FILE = os.getenv("MONGODB_CA_FILE")
+
+mongo_client: Optional[AsyncIOMotorClient] = None
+saved_responses_collection = None
+_mongo_init_lock = asyncio.Lock()
+
+logger = logging.getLogger("command_center.saved_responses")
+if not logger.handlers:
+    stream_handler = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+logger.setLevel(logging.INFO)
 
 # Agent configurations
 AGENT_CONFIGS = {
@@ -93,14 +117,54 @@ class AgentResponse(BaseModel):
     error: Optional[str] = None
 
 
+class SavedResponseHistoryEntry(BaseModel):
+    content: str
+    updated_at: Optional[str] = None
+
+
+class SavedResponseSummary(BaseModel):
+    id: str
+    title: str
+    agent_id: int
+    agent_name: str
+    agent_codename: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class SavedResponseDetail(SavedResponseSummary):
+    content: str
+
+
+class SavedResponseCreate(BaseModel):
+    title: str
+    content: str
+    agent_id: int
+    agent_name: str
+    agent_codename: str
+
+
+class SavedResponseUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+
 # Lifespan context manager
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Startup
     print("🚀 Starting YouTube Automation Agent API...")
+    if MONGODB_URI:
+        try:
+            await _ensure_saved_responses_collection()
+        except HTTPException:
+            pass
     yield
     # Shutdown
     print("🛑 Shutting down YouTube Automation Agent API...")
+    if mongo_client:
+        logger.info("Closing MongoDB client")
+        mongo_client.close()
 
 
 # Initialize FastAPI app
@@ -237,6 +301,160 @@ Remember: You're helping users understand YouTube better. Be conversational, ins
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _ensure_saved_responses_collection():
+    global mongo_client, saved_responses_collection
+
+    if saved_responses_collection:
+        return saved_responses_collection
+
+    if not MONGODB_URI:
+        logger.error("MONGODB_URI not set. Saved responses unavailable.")
+        raise HTTPException(status_code=503, detail="Saved responses service unavailable")
+
+    async with _mongo_init_lock:
+        if saved_responses_collection:
+            return saved_responses_collection
+
+        client: Optional[AsyncIOMotorClient] = None
+        try:
+            logger.info(
+                "Initialising MongoDB client for saved responses (db='%s', collection='%s')",
+                MONGODB_DB or "<empty>",
+                SAVED_RESPONSES_COLLECTION or "<empty>"
+            )
+            client_kwargs: Dict[str, Any] = {}
+            ca_file = MONGODB_CA_FILE
+            if not ca_file:
+                uri_lower = MONGODB_URI.lower()
+                if MONGODB_URI.startswith("mongodb+srv://") or "tls=true" in uri_lower or "ssl=true" in uri_lower:
+                    ca_file = certifi.where()
+            if ca_file:
+                client_kwargs["tlsCAFile"] = ca_file
+
+            client = AsyncIOMotorClient(MONGODB_URI, **client_kwargs)
+            await client.admin.command('ping')
+            mongo_client = client
+            saved_responses_collection = mongo_client[MONGODB_DB][SAVED_RESPONSES_COLLECTION]
+            logger.info("MongoDB connection for saved responses established successfully")
+        except Exception as exc:
+            logger.exception("Failed to initialise MongoDB client: %s", exc)
+            if client:
+                client.close()
+            if mongo_client and mongo_client is not client:
+                mongo_client.close()
+            mongo_client = None
+            saved_responses_collection = None
+
+    if not saved_responses_collection:
+        logger.error("Saved responses collection unavailable. Check MongoDB configuration.")
+        raise HTTPException(status_code=503, detail="Saved responses service unavailable")
+
+    return saved_responses_collection
+
+
+def _serialize_datetime(dt: Optional[datetime]) -> Optional[str]:
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def _serialize_saved_response(doc: Dict[str, Any], include_content: bool = False) -> SavedResponseDetail | SavedResponseSummary:
+    data = {
+        "id": str(doc.get("_id")),
+        "title": doc.get("title", "Untitled Response"),
+        "agent_id": doc.get("agent_id", 0),
+        "agent_name": doc.get("agent_name", ""),
+        "agent_codename": doc.get("agent_codename", ""),
+        "created_at": _serialize_datetime(doc.get("created_at")),
+        "updated_at": _serialize_datetime(doc.get("updated_at")),
+    }
+    if include_content:
+        data["content"] = doc.get("content", "")
+        return SavedResponseDetail(**data)
+    return SavedResponseSummary(**data)
+
+
+def _parse_saved_response_id(response_id: str) -> ObjectId:
+    if not ObjectId.is_valid(response_id):
+        raise HTTPException(status_code=400, detail="Invalid saved response ID")
+    return ObjectId(response_id)
+
+
+@app.get("/api/saved-responses", response_model=List[SavedResponseSummary])
+async def list_saved_responses():
+    collection = await _ensure_saved_responses_collection()
+    cursor = collection.find({}).sort("updated_at", -1)
+    responses: List[SavedResponseSummary] = []
+    async for doc in cursor:
+        responses.append(_serialize_saved_response(doc))
+    return responses
+
+
+@app.post("/api/saved-responses", response_model=SavedResponseDetail, status_code=201)
+async def create_saved_response(request: SavedResponseCreate):
+    collection = await _ensure_saved_responses_collection()
+    now = datetime.now(timezone.utc)
+    doc = {
+        "title": request.title.strip() or "Untitled Response",
+        "content": request.content,
+        "agent_id": request.agent_id,
+        "agent_name": request.agent_name,
+        "agent_codename": request.agent_codename,
+        "created_at": now,
+        "updated_at": now,
+    }
+    result = await collection.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    logger.info("Saved response '%s' (%s)", doc.get("title"), str(result.inserted_id))
+    return _serialize_saved_response(doc, include_content=True)
+
+
+@app.get("/api/saved-responses/{response_id}", response_model=SavedResponseDetail)
+async def get_saved_response(response_id: str):
+    collection = await _ensure_saved_responses_collection()
+    oid = _parse_saved_response_id(response_id)
+    doc = await collection.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Saved response not found")
+    return _serialize_saved_response(doc, include_content=True)
+
+
+@app.put("/api/saved-responses/{response_id}", response_model=SavedResponseDetail)
+async def update_saved_response(response_id: str, request: SavedResponseUpdate):
+    collection = await _ensure_saved_responses_collection()
+    oid = _parse_saved_response_id(response_id)
+    doc = await collection.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Saved response not found")
+
+    update_fields: Dict[str, Any] = {}
+    if request.title is not None:
+        update_fields["title"] = request.title.strip() or "Untitled Response"
+    if request.content is not None:
+        update_fields["content"] = request.content
+    if not update_fields:
+        return _serialize_saved_response(doc, include_content=True)
+
+    update_fields["updated_at"] = datetime.now(timezone.utc)
+    await collection.update_one({"_id": oid}, {"$set": update_fields})
+    doc.update(update_fields)
+    logger.info("Updated saved response '%s' (%s)", doc.get("title"), response_id)
+    return _serialize_saved_response(doc, include_content=True)
+
+
+@app.delete("/api/saved-responses/{response_id}", status_code=204)
+async def delete_saved_response(response_id: str):
+    collection = await _ensure_saved_responses_collection()
+    oid = _parse_saved_response_id(response_id)
+    result = await collection.delete_one({"_id": oid})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Saved response not found")
+    logger.info("Deleted saved response (%s)", response_id)
+    return None
 
 
 # Agent 2: Title Auditor - Analyze titles, thumbnails, keywords, hooks
