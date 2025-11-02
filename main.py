@@ -306,7 +306,7 @@ Remember: You're helping users understand YouTube better. Be conversational, ins
 async def _ensure_saved_responses_collection():
     global mongo_client, saved_responses_collection
 
-    if saved_responses_collection:
+    if saved_responses_collection is not None:
         return saved_responses_collection
 
     if not MONGODB_URI:
@@ -314,7 +314,7 @@ async def _ensure_saved_responses_collection():
         raise HTTPException(status_code=503, detail="Saved responses service unavailable")
 
     async with _mongo_init_lock:
-        if saved_responses_collection:
+        if saved_responses_collection is not None:
             return saved_responses_collection
 
         client: Optional[AsyncIOMotorClient] = None
@@ -347,7 +347,7 @@ async def _ensure_saved_responses_collection():
             mongo_client = None
             saved_responses_collection = None
 
-    if not saved_responses_collection:
+    if saved_responses_collection is None:
         logger.error("Saved responses collection unavailable. Check MongoDB configuration.")
         raise HTTPException(status_code=503, detail="Saved responses service unavailable")
 
