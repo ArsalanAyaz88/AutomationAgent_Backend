@@ -1,13 +1,8 @@
-import asyncio
 import os
-import logging
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -20,28 +15,8 @@ from agents import (
     set_tracing_disabled,
 )
 from youtube_tools import YOUTUBE_TOOLS
-from motor.motor_asyncio import AsyncIOMotorClient
-from bson import ObjectId
-
 # Load environment variables
 load_dotenv()
-
-# MongoDB configuration for command center notepad
-MONGODB_URI = os.getenv("MONGODB_URI")
-MONGODB_DB = os.getenv("MONGODB_DB", "youtube_ops")
-NOTEPAD_COLLECTION = os.getenv("NOTEPAD_COLLECTION", "notepad")
-
-mongo_client: Optional[AsyncIOMotorClient] = None
-notepad_collection = None
-_mongo_init_lock = asyncio.Lock()
-
-logger = logging.getLogger("command_center.notepad")
-if not logger.handlers:
-    stream_handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
-logger.setLevel(logging.INFO)
 
 # Agent configurations
 AGENT_CONFIGS = {
@@ -117,55 +92,14 @@ class AgentResponse(BaseModel):
     error: Optional[str] = None
 
 
-class NotepadHistoryEntry(BaseModel):
-    content: str
-    updated_at: Optional[str] = None
-
-
-class NoteSummary(BaseModel):
-    id: str
-    name: str
-    updated_at: Optional[str] = None
-    created_at: Optional[str] = None
-
-
-class NoteDetail(NoteSummary):
-    content: str
-    history: List[NotepadHistoryEntry] = []
-
-
-class NoteCreate(BaseModel):
-    name: str
-    content: str = ""
-
-
-class NoteUpdate(BaseModel):
-    name: Optional[str] = None
-    content: Optional[str] = None
-
-
 # Lifespan context manager
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     # Startup
     print("🚀 Starting YouTube Automation Agent API...")
-    global mongo_client, notepad_collection
-    if MONGODB_URI:
-        try:
-            await _ensure_notepad_collection()
-        except HTTPException:
-            # Already logged inside helper; continue startup without raising
-            pass
-    else:
-        warning_msg = "MONGODB_URI not set. Notepad endpoints will be unavailable."
-        print(f"⚠️ {warning_msg}")
-        logger.warning(warning_msg)
     yield
     # Shutdown
     print("🛑 Shutting down YouTube Automation Agent API...")
-    if mongo_client:
-        logger.info("Closing MongoDB client")
-        mongo_client.close()
 
 
 # Initialize FastAPI app
@@ -302,195 +236,6 @@ Remember: You're helping users understand YouTube better. Be conversational, ins
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# Notepad endpoints
-
-
-async def _ensure_notepad_collection():
-    global mongo_client, notepad_collection
-
-    if notepad_collection:
-        return notepad_collection
-
-    if not MONGODB_URI:
-        logger.error(
-            "MONGODB_URI not set. Notepad service unavailable."
-        )
-        raise HTTPException(status_code=503, detail="Notepad service unavailable")
-
-    async with _mongo_init_lock:
-        if notepad_collection:
-            return notepad_collection
-
-        try:
-            logger.info(
-                "Initialising MongoDB client (db='%s', collection='%s')",
-                MONGODB_DB or "<empty>",
-                NOTEPAD_COLLECTION or "<empty>"
-            )
-            client = AsyncIOMotorClient(MONGODB_URI)
-            await client.admin.command('ping')
-            mongo_client = client
-            notepad_collection = mongo_client[MONGODB_DB][NOTEPAD_COLLECTION]
-            logger.info("MongoDB connection established successfully")
-        except Exception as exc:
-            logger.exception("Failed to initialise MongoDB client: %s", exc)
-            if mongo_client:
-                mongo_client.close()
-            mongo_client = None
-            notepad_collection = None
-
-    if not notepad_collection:
-        logger.error(
-            "Notepad collection unavailable. Check MongoDB connection and environment variables."
-        )
-        raise HTTPException(status_code=503, detail="Notepad service unavailable")
-
-    return notepad_collection
-
-
-def _serialize_datetime(dt: Optional[datetime]) -> Optional[str]:
-    if not dt:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc).isoformat()
-
-
-def _serialize_history(history: List[Dict[str, Any]]) -> List[NotepadHistoryEntry]:
-    serialized: List[NotepadHistoryEntry] = []
-    for item in history:
-        serialized.append(
-            NotepadHistoryEntry(
-                content=item.get("content", ""),
-                updated_at=_serialize_datetime(item.get("updated_at"))
-            )
-        )
-    return serialized
-
-
-def _serialize_note(doc: Dict[str, Any], include_content: bool = False, include_history: bool = False) -> NoteDetail | NoteSummary:
-    data = {
-        "id": str(doc.get("_id")),
-        "name": doc.get("name", "Untitled"),
-        "updated_at": _serialize_datetime(doc.get("updated_at")),
-        "created_at": _serialize_datetime(doc.get("created_at")),
-    }
-    if include_content:
-        data["content"] = doc.get("content", "")
-    if include_history:
-        data["history"] = _serialize_history(doc.get("history", []))
-    if include_content or include_history:
-        return NoteDetail(**data)  # type: ignore[arg-type]
-    return NoteSummary(**data)  # type: ignore[arg-type]
-
-
-def _parse_object_id(note_id: str) -> ObjectId:
-    if not ObjectId.is_valid(note_id):
-        raise HTTPException(status_code=400, detail="Invalid note ID")
-    return ObjectId(note_id)
-
-
-@app.get("/api/notepad", response_model=List[NoteSummary])
-async def list_notes():
-    collection = await _ensure_notepad_collection()
-    cursor = collection.find({}).sort("updated_at", -1)
-    notes: List[NoteSummary] = []
-    async for doc in cursor:
-        notes.append(_serialize_note(doc))
-    logger.debug("Listed %d notes", len(notes))
-    return notes
-
-
-@app.post("/api/notepad", response_model=NoteDetail, status_code=201)
-async def create_note(request: NoteCreate):
-    collection = await _ensure_notepad_collection()
-    now = datetime.now(timezone.utc)
-    doc = {
-        "name": request.name.strip() or "Untitled",
-        "content": request.content,
-        "created_at": now,
-        "updated_at": now,
-        "history": [],
-    }
-    result = await collection.insert_one(doc)
-    doc["_id"] = result.inserted_id
-    logger.info("Created note '%s' (%s)", doc.get("name"), str(result.inserted_id))
-    return _serialize_note(doc, include_content=True, include_history=True)
-
-
-@app.get("/api/notepad/{note_id}", response_model=NoteDetail)
-async def get_note(note_id: str):
-    collection = await _ensure_notepad_collection()
-    oid = _parse_object_id(note_id)
-    doc = await collection.find_one({"_id": oid})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Note not found")
-    logger.debug("Fetched note '%s' (%s)", doc.get("name"), note_id)
-    return _serialize_note(doc, include_content=True, include_history=True)
-
-
-@app.put("/api/notepad/{note_id}", response_model=NoteDetail)
-async def update_note(note_id: str, request: NoteUpdate):
-    collection = await _ensure_notepad_collection()
-    oid = _parse_object_id(note_id)
-    doc = await collection.find_one({"_id": oid})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Note not found")
-
-    update_fields: Dict[str, Any] = {}
-    now = datetime.now(timezone.utc)
-    history = doc.get("history", [])
-
-    if request.name is not None:
-        update_fields["name"] = request.name.strip() or "Untitled"
-
-    if request.content is not None and request.content != doc.get("content"):
-        history_entry = {
-            "content": doc.get("content", ""),
-            "updated_at": doc.get("updated_at", now)
-        }
-        history.insert(0, history_entry)
-        history = history[:20]
-        update_fields["content"] = request.content
-        update_fields["history"] = history
-
-    if not update_fields:
-        return _serialize_note(doc, include_content=True, include_history=True)
-
-    update_fields["updated_at"] = now
-
-    await collection.update_one({"_id": oid}, {"$set": update_fields})
-    doc.update(update_fields)
-    logger.info("Updated note '%s' (%s)", doc.get("name"), note_id)
-    return _serialize_note(doc, include_content=True, include_history=True)
-
-
-@app.delete("/api/notepad/{note_id}", status_code=204)
-async def delete_note(note_id: str):
-    collection = await _ensure_notepad_collection()
-    oid = _parse_object_id(note_id)
-    result = await collection.delete_one({"_id": oid})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Note not found")
-    logger.info("Deleted note (%s)", note_id)
-    return None
-
-
-@app.get("/api/notepad/{note_id}/download")
-async def download_note(note_id: str):
-    collection = await _ensure_notepad_collection()
-    oid = _parse_object_id(note_id)
-    doc = await collection.find_one({"_id": oid})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Note not found")
-
-    filename = f"{doc.get('name', 'note')}.txt"
-    content = doc.get("content", "")
-    headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
-    logger.debug("Prepared download for note '%s' (%s)", doc.get("name"), note_id)
-    return PlainTextResponse(content, headers=headers)
 
 
 # Agent 2: Title Auditor - Analyze titles, thumbnails, keywords, hooks
