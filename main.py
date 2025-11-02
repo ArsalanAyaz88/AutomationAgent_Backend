@@ -387,11 +387,17 @@ def _parse_saved_response_id(response_id: str) -> ObjectId:
 @app.get("/api/saved-responses", response_model=List[SavedResponseSummary])
 async def list_saved_responses():
     collection = await _ensure_saved_responses_collection()
-    cursor = collection.find({}).sort("updated_at", -1)
-    responses: List[SavedResponseSummary] = []
-    async for doc in cursor:
-        responses.append(_serialize_saved_response(doc))
-    return responses
+    logger.info("Listing saved responses")
+    try:
+        cursor = collection.find({}).sort("updated_at", -1)
+        responses: List[SavedResponseSummary] = []
+        async for doc in cursor:
+            responses.append(_serialize_saved_response(doc))
+        logger.info("Successfully retrieved %d saved responses", len(responses))
+        return responses
+    except Exception as exc:
+        logger.exception("Failed to list saved responses: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to list saved responses")
 
 
 @app.post("/api/saved-responses", response_model=SavedResponseDetail, status_code=201)
