@@ -389,10 +389,9 @@ async def list_saved_responses():
     collection = await _ensure_saved_responses_collection()
     logger.info("Listing saved responses")
     try:
-        cursor = collection.find({}).sort("updated_at", -1)
-        responses: List[SavedResponseSummary] = []
-        async for doc in cursor:
-            responses.append(_serialize_saved_response(doc))
+        # Use to_list() instead of async for to avoid event loop issues
+        docs = await collection.find({}).sort("updated_at", -1).to_list(length=None)
+        responses = [_serialize_saved_response(doc) for doc in docs]
         logger.info("Successfully retrieved %d saved responses", len(responses))
         return responses
     except Exception as exc:
