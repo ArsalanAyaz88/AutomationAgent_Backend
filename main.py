@@ -50,70 +50,35 @@ AGENT_CONFIGS = {
         "model": os.getenv("GEMINI_MODEL_NAME"),
     },
     "agent2": {
-        "base_url": os.getenv("GROQ_BASE_URL"),
-        "api_key": os.getenv("GROQ_API_KEY"),
-        "model": os.getenv("GROQ2_MODEL_NAME"),
+        "base_url": os.getenv("GEMINI_BASE_URL"),
+        "api_key": os.getenv("GEMINI2_API_KEY"),
+        "model": os.getenv("GEMINI2_MODEL_NAME"),
     },
     "agent3": {
-        "base_url": os.getenv("GROQ_BASE_URL"),
-        "api_key": os.getenv("GROQ_API_KEY"),
-        "model": os.getenv("GROQ3_Model_MODEL"),
+        "base_url": os.getenv("GEMINI_BASE_URL"),
+        "api_key": os.getenv("GEMINI2_API_KEY"),
+        "model": os.getenv("GEMINI2_MODEL_NAME"),
     },
     "agent4": {
-        "base_url": os.getenv("GROQ_BASE_URL"),
-        "api_key": os.getenv("GROQ_API_KEY"),
-        "model": os.getenv("GROQ4_Model_MODEL"),
+        "base_url": os.getenv("GEMINI_BASE_URL"),
+        "api_key": os.getenv("GEMINI2_API_KEY"),
+        "model": os.getenv("GEMINI2_MODEL_NAME"),
     },
     "agent5": {
-        "base_url": os.getenv("GROQ_BASE_URL"),
-        "api_key": os.getenv("GROQ_API_KEY"),
-        "model": os.getenv("GROQ5_Model_MODEL"),
+        "base_url": os.getenv("GEMINI_BASE_URL"),
+        "api_key": os.getenv("GEMINI2_API_KEY"),
+        "model": os.getenv("GEMINI2_MODEL_NAME"),
     },
     "agent6": {
         "base_url": os.getenv("GEMINI_BASE_URL"),
         "api_key": os.getenv("GEMINI_API_KEY"),
-        "model": os.getenv("GEMINI_IMAGE_MODEL_NAME"),
+        "model": os.getenv("GEMINI_MODEL_NAME"),
     },
 }
 
 
-# Request/Response Models
-class ChannelAuditRequest(BaseModel):
-    channel_urls: list[str]
-    user_query: Optional[str] = "Audit these channels and identify the hottest one for content creation"
-
-
-class TitleAuditRequest(BaseModel):
-    video_urls: list[str]
-    user_query: Optional[str] = "Analyze these videos for title performance, thumbnail texture, keyword placement, and hooks"
-
-
-class ScriptGenerationRequest(BaseModel):
-    title_audit_data: str
-    topic: str
-    user_query: Optional[str] = None
-
-
-class ScriptToPromptsRequest(BaseModel):
-    script: str
-    user_query: Optional[str] = "Convert this script into scene-by-scene prompts with Hollywood-style direction"
-
-
-class IdeasGenerationRequest(BaseModel):
-    winning_videos_data: str
-    user_query: Optional[str] = "Generate 3 winning titles and thumbnail concepts based on this data"
-
-
-class RoadmapGenerationRequest(BaseModel):
-    niche: str
-    winning_data: Optional[str] = ""
-    user_query: Optional[str] = "Create a 30-video roadmap with 3 title variations and 3 thumbnail concepts for each"
-
-
-class AgentResponse(BaseModel):
-    success: bool
-    result: str
-    error: Optional[str] = None
+# Note: Agent request/response models are now defined in their respective agent files
+# Only keeping shared models here that are used by multiple agents or the API
 
 
 class SavedResponseHistoryEntry(BaseModel):
@@ -201,105 +166,21 @@ def create_agent_client(agent_key: str):
     return config["model"]
 
 
-# Agent 1: Channel Auditor - Deep audit to pick hot channels
-@app.post("/api/agent1/audit-channel", response_model=AgentResponse)
-async def audit_channel(request: ChannelAuditRequest):
-    """
-    Agent 1: Channel Auditor
-    Deep audit of channels to pick the hottest one for content creation.
-    Accepts: channel URLs, video URLs, channel handles (@username), channel names - anything!
-    """
-    try:
-        model_name = create_agent_client("agent1")
-        
-        # Build query - let the agent figure out what user provided
-        if request.channel_urls and len(request.channel_urls) > 0:
-            query = f"{request.user_query}\n\nUser provided:\n"
-            query += "\n".join([f"- {url}" for url in request.channel_urls])
-        else:
-            # Pure conversation mode
-            query = request.user_query
-        
-        agent = Agent(
-            name="YouTube Channel Auditor",
-            instructions="""You are a friendly and expert YouTube channel auditor. 
+# Import and register all agent routes
+from AllAgents.Agent_1_ChannelAuditor.Agent_1_ChannelAuditor import register_agent1_routes
+from AllAgents.Agent_2_TitleAuditor.Agent_2_TitleAuditor import register_agent2_routes
+from AllAgents.Agent_3_ScriptGenerator.Agent_3_ScriptGenerator import register_agent3_routes
+from AllAgents.Agent_4_ScriptToScene.Agent_4_ScriptToScene import register_agent4_routes
+from AllAgents.Agent_5_generateIdeas.Agent_5_generateIdeas import register_agent5_routes
+from AllAgents.Agent_6_roadmap.Agent_6_roadmap import register_agent6_routes
 
-🎯 YOUR CORE CAPABILITIES:
-1. Analyze YouTube channels in depth
-2. Evaluate performance metrics, content strategy, and growth patterns
-3. Identify successful channels and what makes them work
-4. Provide actionable insights and recommendations
-5. Chat naturally about YouTube topics
-
-🔒 GUARDRAILS - ONLY YOUTUBE TOPICS:
-- ONLY discuss YouTube-related topics (channels, videos, content strategy, growth, monetization)
-- If user asks about non-YouTube topics, politely redirect: "I specialize in YouTube analysis. Let's talk about YouTube channels, videos, or content strategy!"
-- Stay focused on YouTube ecosystem
-
-🤖 INTELLIGENT INPUT HANDLING:
-You can automatically handle various inputs the user provides:
-
-A. VIDEO URLs (any format):
-   - https://youtube.com/watch?v=ABC123
-   - https://youtu.be/ABC123
-   - Just video ID: ABC123
-   → Action: Extract video ID, get video details, extract channelId, then analyze the channel
-
-B. CHANNEL URLs (any format):
-   - https://youtube.com/@channelname
-   - https://www.youtube.com/channel/UCxxxxxx
-   - https://youtube.com/c/CustomName
-   → Action: Directly analyze the channel
-
-C. CHANNEL HANDLES:
-   - @channelname
-   - channelname (without @)
-   → Action: Search for channel by handle, then analyze
-
-D. CHANNEL NAMES:
-   - "MrBeast"
-   - "Tech Channel XYZ"
-   → Action: Search for channel by name, then analyze
-
-E. GENERAL QUESTIONS:
-   - "What makes a successful YouTube channel?"
-   - "How do I grow my subscribers?"
-   - "Tell me about YouTube algorithm"
-   → Action: Provide helpful, conversational answers about YouTube
-
-🚀 WORKFLOW FOR ANALYSIS:
-1. Identify what user provided (video/channel/handle/name)
-2. If VIDEO URL: Get video → Extract channelId → Analyze channel
-3. If CHANNEL URL: Directly analyze channel
-4. If HANDLE/NAME: Search for channel → Analyze
-5. Present findings in clear, actionable format
-
-💬 CONVERSATION STYLE:
-- Be friendly and helpful
-- Explain technical concepts simply
-- Give examples and practical advice
-- Ask clarifying questions if needed
-- Keep responses focused and valuable
-
-📊 ANALYSIS DEPTH:
-- Views and engagement metrics
-- Upload frequency and consistency
-- Content themes and formats
-- Audience retention signals
-- Growth patterns
-- Monetization strategies
-- Competitive positioning
-
-Remember: You're helping users understand YouTube better. Be conversational, insightful, and always provide actionable advice!""",
-            model=model_name,
-            tools=YOUTUBE_TOOLS
-        )
-        
-        result = await Runner.run(agent, query)
-        return AgentResponse(success=True, result=result.final_output)
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# Register all agent routes with the app
+register_agent1_routes(app, create_agent_client, YOUTUBE_TOOLS)
+register_agent2_routes(app, create_agent_client, YOUTUBE_TOOLS)
+register_agent3_routes(app, create_agent_client, YOUTUBE_TOOLS)
+register_agent4_routes(app, create_agent_client, YOUTUBE_TOOLS)
+register_agent5_routes(app, create_agent_client, YOUTUBE_TOOLS)
+register_agent6_routes(app, create_agent_client, YOUTUBE_TOOLS)
 
 
 def _ensure_saved_responses_collection():
@@ -458,202 +339,6 @@ async def delete_saved_response(response_id: str):
     logger.info("Deleted saved response (%s)", response_id)
     return None
 
-
-# Agent 2: Title Auditor - Analyze titles, thumbnails, keywords, hooks
-@app.post("/api/agent2/audit-titles", response_model=AgentResponse)
-async def audit_titles(request: TitleAuditRequest):
-    """
-    Agent 2: Title Auditor
-    Analyzes video titles, positions, formats, thumbnail textures, keyword placements, and hooks.
-    """
-    try:
-        model_name = create_agent_client("agent2")
-        
-        query = f"{request.user_query}\n\nVideos to analyze:\n"
-        query += "\n".join([f"- {url}" for url in request.video_urls])
-        
-        agent = Agent(
-            name="Title & Thumbnail Auditor",
-            instructions="""You are an expert at analyzing YouTube video performance patterns. Your job is to:
-            1. Analyze video titles for their structure, formulas, and patterns
-            2. Identify what makes titles perform well (numbers, questions, power words)
-            3. Evaluate thumbnail characteristics (text placement, colors, faces, contrast)
-            4. Extract keyword placement strategies
-            5. Analyze hook effectiveness in the first 10 seconds
-            6. Identify the "winning formula" across top performers
-
-            Provide detailed breakdowns of each element with examples and patterns.""",
-            model=model_name,
-            tools=YOUTUBE_TOOLS
-        )
-        
-        result = await Runner.run(agent, query)
-        return AgentResponse(success=True, result=result.final_output)
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Agent 3: Script Writer - Generate script based on title audit data
-@app.post("/api/agent3/generate-script", response_model=AgentResponse)
-async def generate_script(request: ScriptGenerationRequest):
-    """
-    Agent 3: Script Writer
-    Generates video scripts based on title audit data and winning patterns.
-    """
-    try:
-        model_name = create_agent_client("agent3")
-        
-        query = request.user_query or f"""Based on the following title audit data, create a compelling YouTube video script for: {request.topic}
-
-Title Audit Data:
-{request.title_audit_data}
-
-Generate a script that follows the winning patterns identified in the audit."""
-        
-        agent = Agent(
-            name="Script Writer",
-            instructions="""You are an expert YouTube script writer. Your job is to:
-            1. Analyze the winning patterns from title audit data
-            2. Create engaging, hook-driven scripts optimized for viewer retention
-            3. Structure scripts with: Hook (first 10s), Value Promise, Main Content, CTA
-            4. Use storytelling techniques that match successful videos
-            5. Include natural transitions and pacing cues
-            6. Optimize for the 3-minute, 5-minute, or 10-minute formats based on data
-            
-            Write scripts that are conversational, engaging, and designed to maximize watch time.""",
-            model=model_name,
-        )
-        
-        result = await Runner.run(agent, query)
-        return AgentResponse(success=True, result=result.final_output)
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Agent 4: Script to Prompts - Convert script to scene-by-scene prompts
-@app.post("/api/agent4/script-to-prompts", response_model=AgentResponse)
-async def script_to_prompts(request: ScriptToPromptsRequest):
-    """
-    Agent 4: Script to Prompts Converter
-    Converts scripts into detailed scene-by-scene prompts with Hollywood-style direction.
-    """
-    try:
-        model_name = create_agent_client("agent4")
-        
-        query = f"""{request.user_query}
-
-Script:
-{request.script}"""
-        
-        agent = Agent(
-            name="Script to Prompts Converter",
-            instructions="""You are a Hollywood-level director converting scripts into detailed visual prompts. Your job is to:
-            1. Break down the script into individual scenes
-            2. Identify scene transitions and when to change angles/shots
-            3. Specify camera angles (wide, medium, close-up, over-shoulder, etc.)
-            4. Describe visual style, lighting, and mood for each scene
-            5. Add B-roll suggestions and visual elements
-            6. Include timing and pacing notes
-            7. Specify text overlays, graphics, or effects needed
-            
-            Create prompts suitable for AI image/video generation or human videographers.
-            Format: Scene number, timestamp, shot type, description, mood, visual notes.""",
-            model=model_name,
-        )
-        
-        result = await Runner.run(agent, query)
-        return AgentResponse(success=True, result=result.final_output)
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Agent 5: Ideas Generator - Generate 3 winning titles and thumbnail concepts
-@app.post("/api/agent5/generate-ideas", response_model=AgentResponse)
-async def generate_ideas(request: IdeasGenerationRequest):
-    """
-    Agent 5: Ideas Generator
-    Generates 3 winning titles and thumbnail concepts based on winning video data.
-    """
-    try:
-        model_name = create_agent_client("agent5")
-        
-        query = f"""{request.user_query}
-
-Winning Videos Data:
-{request.winning_videos_data}"""
-        
-        agent = Agent(
-            name="Ideas Generator",
-            instructions="""You are a YouTube content strategist specializing in viral titles and thumbnails. Your job is to:
-            1. Analyze winning video patterns from the provided data
-            2. Generate 3 title variations that follow proven formulas:
-               - Curiosity-driven titles
-               - Benefit-focused titles
-               - Controversy/Surprising titles
-            3. For each title, create a matching thumbnail concept describing:
-               - Main visual element (face, object, text)
-               - Color scheme and contrast
-               - Text overlay position and style
-               - Emotional trigger (shock, curiosity, excitement)
-            4. Ensure titles are 40-70 characters for optimal display
-            5. Make thumbnails highly clickable while avoiding clickbait
-            
-            Output format: Title 1 + Thumbnail concept 1, Title 2 + Thumbnail concept 2, Title 3 + Thumbnail concept 3""",
-            model=model_name,
-        )
-        
-        result = await Runner.run(agent, query)
-        return AgentResponse(success=True, result=result.final_output)
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Agent 6: Roadmap Generator - Create 30-video roadmap with titles and thumbnails
-@app.post("/api/agent6/generate-roadmap", response_model=AgentResponse)
-async def generate_roadmap(request: RoadmapGenerationRequest):
-    """
-    Agent 6: Roadmap Generator
-    Creates a 30-video content roadmap with 3 title variations and 3 thumbnail concepts for each.
-    """
-    try:
-        model_name = create_agent_client("agent6")
-        
-        query = f"""{request.user_query}
-
-Niche: {request.niche}
-
-Winning Data (if provided):
-{request.winning_data}"""
-        
-        agent = Agent(
-            name="Content Roadmap Generator",
-            instructions="""You are a YouTube content strategist creating comprehensive content roadmaps. Your job is to:
-            1. Create a 30-video content roadmap for the specified niche
-            2. For EACH video, generate:
-               - 3 title variations (different angles on the same topic)
-               - 3 thumbnail concepts (different visual approaches)
-            3. Organize videos strategically:
-               - Mix evergreen and trending topics
-               - Build on previous videos (series potential)
-               - Include various content types (tutorials, lists, reviews, storytelling)
-            4. Consider SEO and search intent
-            5. Balance beginner-friendly and advanced content
-            6. Include estimated difficulty and priority for each video
-            
-            Output a structured roadmap with:
-            Video #, Topic, 3 Title Options, 3 Thumbnail Concepts, Priority Level, Estimated Difficulty""",
-            model=model_name,
-        )
-        
-        result = await Runner.run(agent, query)
-        return AgentResponse(success=True, result=result.final_output)
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Health check endpoint
