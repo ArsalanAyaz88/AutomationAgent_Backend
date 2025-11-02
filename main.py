@@ -33,6 +33,7 @@ NOTEPAD_COLLECTION = os.getenv("NOTEPAD_COLLECTION", "notepad")
 
 mongo_client: Optional[AsyncIOMotorClient] = None
 notepad_collection = None
+_mongo_init_lock = asyncio.Lock()
 
 logger = logging.getLogger("command_center.notepad")
 if not logger.handlers:
@@ -151,19 +152,10 @@ async def lifespan(app: FastAPI):
     global mongo_client, notepad_collection
     if MONGODB_URI:
         try:
-            logger.info(
-                "Initialising MongoDB client (db='%s', collection='%s')",
-                MONGODB_DB or "<empty>",
-                NOTEPAD_COLLECTION or "<empty>"
-            )
-            mongo_client = AsyncIOMotorClient(MONGODB_URI)
-            await mongo_client.admin.command('ping')
-            notepad_collection = mongo_client[MONGODB_DB][NOTEPAD_COLLECTION]
-            logger.info("MongoDB connection established successfully")
-        except Exception as exc:
-            logger.exception("Failed to initialise MongoDB client: %s", exc)
-            mongo_client = None
-            notepad_collection = None
+            await _ensure_notepad_collection()
+        except HTTPException:
+            # Already logged inside helper; continue startup without raising
+            pass
     else:
         warning_msg = "MONGODB_URI not set. Notepad endpoints will be unavailable."
         print(f"⚠️ {warning_msg}")
@@ -313,12 +305,48 @@ Remember: You're helping users understand YouTube better. Be conversational, ins
 
 
 # Notepad endpoints
-def _ensure_notepad_collection():
+
+
+async def _ensure_notepad_collection():
+    global mongo_client, notepad_collection
+
+    if notepad_collection:
+        return notepad_collection
+
+    if not MONGODB_URI:
+        logger.error(
+            "MONGODB_URI not set. Notepad service unavailable."
+        )
+        raise HTTPException(status_code=503, detail="Notepad service unavailable")
+
+    async with _mongo_init_lock:
+        if notepad_collection:
+            return notepad_collection
+
+        try:
+            logger.info(
+                "Initialising MongoDB client (db='%s', collection='%s')",
+                MONGODB_DB or "<empty>",
+                NOTEPAD_COLLECTION or "<empty>"
+            )
+            client = AsyncIOMotorClient(MONGODB_URI)
+            await client.admin.command('ping')
+            mongo_client = client
+            notepad_collection = mongo_client[MONGODB_DB][NOTEPAD_COLLECTION]
+            logger.info("MongoDB connection established successfully")
+        except Exception as exc:
+            logger.exception("Failed to initialise MongoDB client: %s", exc)
+            if mongo_client:
+                mongo_client.close()
+            mongo_client = None
+            notepad_collection = None
+
     if not notepad_collection:
         logger.error(
             "Notepad collection unavailable. Check MongoDB connection and environment variables."
         )
         raise HTTPException(status_code=503, detail="Notepad service unavailable")
+
     return notepad_collection
 
 
@@ -366,7 +394,7 @@ def _parse_object_id(note_id: str) -> ObjectId:
 
 @app.get("/api/notepad", response_model=List[NoteSummary])
 async def list_notes():
-    collection = _ensure_notepad_collection()
+    collection = await _ensure_notepad_collection()
     cursor = collection.find({}).sort("updated_at", -1)
     notes: List[NoteSummary] = []
     async for doc in cursor:
@@ -377,7 +405,7 @@ async def list_notes():
 
 @app.post("/api/notepad", response_model=NoteDetail, status_code=201)
 async def create_note(request: NoteCreate):
-    collection = _ensure_notepad_collection()
+    collection = await _ensure_notepad_collection()
     now = datetime.now(timezone.utc)
     doc = {
         "name": request.name.strip() or "Untitled",
@@ -394,7 +422,7 @@ async def create_note(request: NoteCreate):
 
 @app.get("/api/notepad/{note_id}", response_model=NoteDetail)
 async def get_note(note_id: str):
-    collection = _ensure_notepad_collection()
+    collection = await _ensure_notepad_collection()
     oid = _parse_object_id(note_id)
     doc = await collection.find_one({"_id": oid})
     if not doc:
@@ -405,7 +433,7 @@ async def get_note(note_id: str):
 
 @app.put("/api/notepad/{note_id}", response_model=NoteDetail)
 async def update_note(note_id: str, request: NoteUpdate):
-    collection = _ensure_notepad_collection()
+    collection = await _ensure_notepad_collection()
     oid = _parse_object_id(note_id)
     doc = await collection.find_one({"_id": oid})
     if not doc:
@@ -441,7 +469,7 @@ async def update_note(note_id: str, request: NoteUpdate):
 
 @app.delete("/api/notepad/{note_id}", status_code=204)
 async def delete_note(note_id: str):
-    collection = _ensure_notepad_collection()
+    collection = await _ensure_notepad_collection()
     oid = _parse_object_id(note_id)
     result = await collection.delete_one({"_id": oid})
     if result.deleted_count == 0:
@@ -452,7 +480,7 @@ async def delete_note(note_id: str):
 
 @app.get("/api/notepad/{note_id}/download")
 async def download_note(note_id: str):
-    collection = _ensure_notepad_collection()
+    collection = await _ensure_notepad_collection()
     oid = _parse_object_id(note_id)
     doc = await collection.find_one({"_id": oid})
     if not doc:
