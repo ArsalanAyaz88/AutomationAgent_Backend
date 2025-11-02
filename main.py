@@ -1,5 +1,6 @@
 import asyncio
 import os
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
@@ -32,6 +33,14 @@ NOTEPAD_COLLECTION = os.getenv("NOTEPAD_COLLECTION", "notepad")
 
 mongo_client: Optional[AsyncIOMotorClient] = None
 notepad_collection = None
+
+logger = logging.getLogger("command_center.notepad")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 # Agent configurations
 AGENT_CONFIGS = {
@@ -141,14 +150,29 @@ async def lifespan(app: FastAPI):
     print("🚀 Starting YouTube Automation Agent API...")
     global mongo_client, notepad_collection
     if MONGODB_URI:
-        mongo_client = AsyncIOMotorClient(MONGODB_URI)
-        notepad_collection = mongo_client[MONGODB_DB][NOTEPAD_COLLECTION]
+        try:
+            logger.info(
+                "Initialising MongoDB client (db='%s', collection='%s')",
+                MONGODB_DB or "<empty>",
+                NOTEPAD_COLLECTION or "<empty>"
+            )
+            mongo_client = AsyncIOMotorClient(MONGODB_URI)
+            await mongo_client.admin.command('ping')
+            notepad_collection = mongo_client[MONGODB_DB][NOTEPAD_COLLECTION]
+            logger.info("MongoDB connection established successfully")
+        except Exception as exc:
+            logger.exception("Failed to initialise MongoDB client: %s", exc)
+            mongo_client = None
+            notepad_collection = None
     else:
-        print("⚠️ MONGODB_URI not set. Notepad endpoints will be unavailable.")
+        warning_msg = "MONGODB_URI not set. Notepad endpoints will be unavailable."
+        print(f"⚠️ {warning_msg}")
+        logger.warning(warning_msg)
     yield
     # Shutdown
     print("🛑 Shutting down YouTube Automation Agent API...")
     if mongo_client:
+        logger.info("Closing MongoDB client")
         mongo_client.close()
 
 
@@ -291,6 +315,9 @@ Remember: You're helping users understand YouTube better. Be conversational, ins
 # Notepad endpoints
 def _ensure_notepad_collection():
     if not notepad_collection:
+        logger.error(
+            "Notepad collection unavailable. Check MongoDB connection and environment variables."
+        )
         raise HTTPException(status_code=503, detail="Notepad service unavailable")
     return notepad_collection
 
@@ -344,6 +371,7 @@ async def list_notes():
     notes: List[NoteSummary] = []
     async for doc in cursor:
         notes.append(_serialize_note(doc))
+    logger.debug("Listed %d notes", len(notes))
     return notes
 
 
@@ -360,6 +388,7 @@ async def create_note(request: NoteCreate):
     }
     result = await collection.insert_one(doc)
     doc["_id"] = result.inserted_id
+    logger.info("Created note '%s' (%s)", doc.get("name"), str(result.inserted_id))
     return _serialize_note(doc, include_content=True, include_history=True)
 
 
@@ -370,6 +399,7 @@ async def get_note(note_id: str):
     doc = await collection.find_one({"_id": oid})
     if not doc:
         raise HTTPException(status_code=404, detail="Note not found")
+    logger.debug("Fetched note '%s' (%s)", doc.get("name"), note_id)
     return _serialize_note(doc, include_content=True, include_history=True)
 
 
@@ -405,6 +435,7 @@ async def update_note(note_id: str, request: NoteUpdate):
 
     await collection.update_one({"_id": oid}, {"$set": update_fields})
     doc.update(update_fields)
+    logger.info("Updated note '%s' (%s)", doc.get("name"), note_id)
     return _serialize_note(doc, include_content=True, include_history=True)
 
 
@@ -415,6 +446,7 @@ async def delete_note(note_id: str):
     result = await collection.delete_one({"_id": oid})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Note not found")
+    logger.info("Deleted note (%s)", note_id)
     return None
 
 
@@ -429,6 +461,7 @@ async def download_note(note_id: str):
     filename = f"{doc.get('name', 'note')}.txt"
     content = doc.get("content", "")
     headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+    logger.debug("Prepared download for note '%s' (%s)", doc.get("name"), note_id)
     return PlainTextResponse(content, headers=headers)
 
 
