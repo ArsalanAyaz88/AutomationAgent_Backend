@@ -37,21 +37,37 @@ def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
             base_framework = """
 SCENE BREAKDOWN FRAMEWORK:
 
-For each scene provide:
-1. TIMESTAMP: Start-end time — each scene must be exactly 8 seconds long (no more, no less)
-2. VOICEOVER/DIALOGUE: Script text for this scene
-3. SHOT BREAKDOWN: Shot type, camera angle, movement, subject, background
-4. LIGHTING SETUP: Style, key/fill/back lights, mood, color temperature
-5. VISUAL MOOD: Overall atmosphere and tone
-6. VISUAL ELEMENTS: Text overlays, graphics, special elements
-7. TRANSITION: How to transition to next scene
-8. AI GENERATION PROMPT: Detailed prompt for AI video tools
+Priority order:
+- User-provided instructions, constraints, or preferences take absolute precedence over defaults.
+- Only fall back to the guidelines below when the user prompt is silent on a requirement.
+
+Tone & scope guidelines:
+- Communicate in a warm, encouraging, YouTube-savvy voice (think collaborative creative partner).
+- Keep discussion anchored to YouTube video production, storytelling, or visual execution. Avoid unrelated topics.
+
+Scene segmentation guidelines:
+- Analyze the script's narrative shifts, locations, emotions, or beat changes.
+- Create as many scenes as required based on the script (one scene if appropriate, otherwise multiple scenes).
+- Maintain a continuous timeline. Each scene must span exactly 8 seconds (no more, no less) from its start to end timestamp.
+
+For each scene provide (within its own Markdown ```json code block):
+1. "scene": Clear label with scene number and descriptive title.
+2. "duration": Start-end time (e.g., "0:00-0:08") — must equal 8 seconds.
+3. "character": Primary speaker or focus (e.g., narrator name, subject).
+4. "segments": Nested object covering the full 0-8 second range (e.g., "0-2s", "2-5s", "5-8s") describing visual beats.
+5. "sound": Ambience or SFX.
+6. "voiceover": Spoken line for the scene.
+7. Optional fields (e.g., "camera", "notes") are allowed if helpful.
 
 Shot Types: EWS, WS, MS, MCU, CU, ECU
 Angles: Eye level, High, Low, Dutch, Bird's eye, Worm's eye
 Movement: Static, Pan, Tilt, Dolly, Tracking, Crane, Handheld, Gimbal
 Lighting: Three-point, Natural, High key, Low key, Silhouette
-Pacing: Fast (3-8s), Balanced (8-15s), Cinematic (15-30s)"""
+Pacing: Fast (3-8s), Balanced (8-15s), Cinematic (15-30s)
+
+Final Output Requirement:
+- Present each scene as a separate ```json code block so it can be copied easily.
+- Ensure scene objects are valid JSON (double quotes, comma-separated pairs, etc.)."""
             
             # ========================================
             # PHASE 1: PLANNER AGENT
@@ -85,13 +101,17 @@ Create a complete execution plan covering all scenes with timing, shots, lightin
             # ========================================
             critic_instructions = f"""You are a Critic LLM. Review the scene breakdown plan below and identify:
 
-1. COMPLETENESS: Are ALL parts of the script covered?
-2. TIMING ACCURACY: Does every scene span exactly 8 seconds between start and end timestamps?
-3. CONSISTENCY: Is visual style uniform across scenes?
-4. MISSING ELEMENTS: Any missing shots, lighting, transitions, or AI prompts?
-5. TECHNICAL QUALITY: Are AI prompts generation-ready?
-6. ISSUES FOUND: List specific problems
-7. RECOMMENDATIONS: How to improve the plan
+1. USER COMPLIANCE: Does the plan follow every explicit instruction from the user prompt (formatting, focus, counts, tone, etc.)?
+2. FRIENDLY YOUTUBE TONE: Is the narration/supportive language warm, collaborative, and clearly tied to YouTube filmmaking?
+3. COMPLETENESS: Are ALL parts of the script covered with the right number of scenes?
+4. TIMING ACCURACY: Does every scene span exactly 8 seconds between start and end timestamps?
+5. SEGMENT COVERAGE: Do the "segments" keys cover the entire 0-8 second window with no gaps/overlap?
+6. JSON FORMAT: Is each scene provided as a standalone ```json code block with valid JSON structure and required keys?
+7. CONSISTENCY: Is visual style coherent across scenes when needed?
+8. MISSING ELEMENTS: Any missing shots, lighting, sound, or voiceover details?
+9. TECHNICAL QUALITY: Are details production-ready and unambiguous?
+10. ISSUES FOUND: List specific problems
+11. RECOMMENDATIONS: How to improve the plan
 
 Original Script:
 {request.script}
@@ -131,8 +151,8 @@ Critic's Feedback:
 {critique}
 
 Task: Create a REFINED, COMPLETE scene breakdown that addresses all issues raised by the Critic. 
-Ensure every scene is exactly 8 seconds long and has complete details (timestamp, dialogue, shots, lighting, mood, transitions, AI prompts). 
-Output only the final polished breakdown."""
+Follow every explicit user directive before applying defaults. Maintain a friendly, YouTube-focused tone. Ensure every scene is exactly 8 seconds long, uses valid JSON structure inside its own ```json code block, and includes complete details (duration, character, segments, sound, voiceover, plus any supporting notes). 
+Output only the final polished breakdown with one code block per scene."""
             
             refined_planner_agent = Agent(
                 name="Refined Planner LLM",
