@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import MongoClient
 from bson import ObjectId
 
 from openai import AsyncOpenAI
@@ -31,9 +31,8 @@ MONGODB_DB = os.getenv("MONGODB_DB", "youtube_ops")
 SAVED_RESPONSES_COLLECTION = os.getenv("SAVED_RESPONSES_COLLECTION", "saved_responses")
 MONGODB_CA_FILE = os.getenv("MONGODB_CA_FILE")
 
-mongo_client: Optional[AsyncIOMotorClient] = None
+mongo_client: Optional[MongoClient] = None
 saved_responses_collection = None
-_mongo_init_lock = asyncio.Lock()
 
 logger = logging.getLogger("command_center.saved_responses")
 if not logger.handlers:
@@ -156,7 +155,7 @@ async def lifespan(_app: FastAPI):
     print("🚀 Starting YouTube Automation Agent API...")
     if MONGODB_URI:
         try:
-            await _ensure_saved_responses_collection()
+            _ensure_saved_responses_collection()
         except HTTPException:
             pass
     yield
@@ -303,7 +302,7 @@ Remember: You're helping users understand YouTube better. Be conversational, ins
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def _ensure_saved_responses_collection():
+def _ensure_saved_responses_collection():
     global mongo_client, saved_responses_collection
 
     if saved_responses_collection is not None:
@@ -313,39 +312,38 @@ async def _ensure_saved_responses_collection():
         logger.error("MONGODB_URI not set. Saved responses unavailable.")
         raise HTTPException(status_code=503, detail="Saved responses service unavailable")
 
-    async with _mongo_init_lock:
-        if saved_responses_collection is not None:
-            return saved_responses_collection
+    if saved_responses_collection is not None:
+        return saved_responses_collection
 
-        client: Optional[AsyncIOMotorClient] = None
-        try:
-            logger.info(
-                "Initialising MongoDB client for saved responses (db='%s', collection='%s')",
-                MONGODB_DB or "<empty>",
-                SAVED_RESPONSES_COLLECTION or "<empty>"
-            )
-            client_kwargs: Dict[str, Any] = {}
-            ca_file = MONGODB_CA_FILE
-            if not ca_file:
-                uri_lower = MONGODB_URI.lower()
-                if MONGODB_URI.startswith("mongodb+srv://") or "tls=true" in uri_lower or "ssl=true" in uri_lower:
-                    ca_file = certifi.where()
-            if ca_file:
-                client_kwargs["tlsCAFile"] = ca_file
+    client: Optional[MongoClient] = None
+    try:
+        logger.info(
+            "Initialising MongoDB client for saved responses (db='%s', collection='%s')",
+            MONGODB_DB or "<empty>",
+            SAVED_RESPONSES_COLLECTION or "<empty>"
+        )
+        client_kwargs: Dict[str, Any] = {}
+        ca_file = MONGODB_CA_FILE
+        if not ca_file:
+            uri_lower = MONGODB_URI.lower()
+            if MONGODB_URI.startswith("mongodb+srv://") or "tls=true" in uri_lower or "ssl=true" in uri_lower:
+                ca_file = certifi.where()
+        if ca_file:
+            client_kwargs["tlsCAFile"] = ca_file
 
-            client = AsyncIOMotorClient(MONGODB_URI, **client_kwargs)
-            await client.admin.command('ping')
-            mongo_client = client
-            saved_responses_collection = mongo_client[MONGODB_DB][SAVED_RESPONSES_COLLECTION]
-            logger.info("MongoDB connection for saved responses established successfully")
-        except Exception as exc:
-            logger.exception("Failed to initialise MongoDB client: %s", exc)
-            if client:
-                client.close()
-            if mongo_client and mongo_client is not client:
-                mongo_client.close()
-            mongo_client = None
-            saved_responses_collection = None
+        client = MongoClient(MONGODB_URI, **client_kwargs)
+        client.admin.command('ping')
+        mongo_client = client
+        saved_responses_collection = mongo_client[MONGODB_DB][SAVED_RESPONSES_COLLECTION]
+        logger.info("MongoDB connection for saved responses established successfully")
+    except Exception as exc:
+        logger.exception("Failed to initialise MongoDB client: %s", exc)
+        if client:
+            client.close()
+        if mongo_client and mongo_client is not client:
+            mongo_client.close()
+        mongo_client = None
+        saved_responses_collection = None
 
     if saved_responses_collection is None:
         logger.error("Saved responses collection unavailable. Check MongoDB configuration.")
@@ -386,11 +384,10 @@ def _parse_saved_response_id(response_id: str) -> ObjectId:
 
 @app.get("/api/saved-responses", response_model=List[SavedResponseSummary])
 async def list_saved_responses():
-    collection = await _ensure_saved_responses_collection()
+    collection = _ensure_saved_responses_collection()
     logger.info("Listing saved responses")
     try:
-        # Use to_list() instead of async for to avoid event loop issues
-        docs = await collection.find({}).sort("updated_at", -1).to_list(length=None)
+        docs = list(collection.find({}).sort("updated_at", -1))
         responses = [_serialize_saved_response(doc) for doc in docs]
         logger.info("Successfully retrieved %d saved responses", len(responses))
         return responses
@@ -401,7 +398,7 @@ async def list_saved_responses():
 
 @app.post("/api/saved-responses", response_model=SavedResponseDetail, status_code=201)
 async def create_saved_response(request: SavedResponseCreate):
-    collection = await _ensure_saved_responses_collection()
+    collection = _ensure_saved_responses_collection()
     now = datetime.now(timezone.utc)
     doc = {
         "title": request.title.strip() or "Untitled Response",
@@ -412,7 +409,7 @@ async def create_saved_response(request: SavedResponseCreate):
         "created_at": now,
         "updated_at": now,
     }
-    result = await collection.insert_one(doc)
+    result = collection.insert_one(doc)
     doc["_id"] = result.inserted_id
     logger.info("Saved response '%s' (%s)", doc.get("title"), str(result.inserted_id))
     return _serialize_saved_response(doc, include_content=True)
@@ -420,9 +417,9 @@ async def create_saved_response(request: SavedResponseCreate):
 
 @app.get("/api/saved-responses/{response_id}", response_model=SavedResponseDetail)
 async def get_saved_response(response_id: str):
-    collection = await _ensure_saved_responses_collection()
+    collection = _ensure_saved_responses_collection()
     oid = _parse_saved_response_id(response_id)
-    doc = await collection.find_one({"_id": oid})
+    doc = collection.find_one({"_id": oid})
     if not doc:
         raise HTTPException(status_code=404, detail="Saved response not found")
     return _serialize_saved_response(doc, include_content=True)
@@ -430,9 +427,9 @@ async def get_saved_response(response_id: str):
 
 @app.put("/api/saved-responses/{response_id}", response_model=SavedResponseDetail)
 async def update_saved_response(response_id: str, request: SavedResponseUpdate):
-    collection = await _ensure_saved_responses_collection()
+    collection = _ensure_saved_responses_collection()
     oid = _parse_saved_response_id(response_id)
-    doc = await collection.find_one({"_id": oid})
+    doc = collection.find_one({"_id": oid})
     if not doc:
         raise HTTPException(status_code=404, detail="Saved response not found")
 
@@ -445,7 +442,7 @@ async def update_saved_response(response_id: str, request: SavedResponseUpdate):
         return _serialize_saved_response(doc, include_content=True)
 
     update_fields["updated_at"] = datetime.now(timezone.utc)
-    await collection.update_one({"_id": oid}, {"$set": update_fields})
+    collection.update_one({"_id": oid}, {"$set": update_fields})
     doc.update(update_fields)
     logger.info("Updated saved response '%s' (%s)", doc.get("title"), response_id)
     return _serialize_saved_response(doc, include_content=True)
@@ -453,9 +450,9 @@ async def update_saved_response(response_id: str, request: SavedResponseUpdate):
 
 @app.delete("/api/saved-responses/{response_id}", status_code=204)
 async def delete_saved_response(response_id: str):
-    collection = await _ensure_saved_responses_collection()
+    collection = _ensure_saved_responses_collection()
     oid = _parse_saved_response_id(response_id)
-    result = await collection.delete_one({"_id": oid})
+    result = collection.delete_one({"_id": oid})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Saved response not found")
     logger.info("Deleted saved response (%s)", response_id)
