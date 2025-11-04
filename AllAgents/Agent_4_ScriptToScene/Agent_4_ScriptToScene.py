@@ -4,6 +4,7 @@ Uses Planner-Critic multi-agent pattern for intelligent task decomposition.
 """
 
 from typing import Optional
+import re
 from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
@@ -23,6 +24,33 @@ class AgentResponse(BaseModel):
 
 def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
     """Register Agent 4 routes with Planner-Critic multi-agent system"""
+    def _sanitize_for_veo(text: str) -> str:
+        if not isinstance(text, str):
+            return text
+        out = text
+        # Soften or remove explicit mentions of human remains/graphic injury
+        replacements = {
+            r"\b(lifeless\s+bodies|bodies|corpse|corpses|dead\s+bodies)\b": "sensitive elements",
+            r"\b(remains)\b": "sensitive elements",
+            r"\b(blood|bloody|gore|gory|severed|mutilated)\b": "damage",
+            r"\b(killed|dead|death)\b": "serious incident",
+        }
+        for pat, repl in replacements.items():
+            out = re.sub(pat, repl, out, flags=re.IGNORECASE)
+
+        # Anonymize private individual names in the JSON character field if present
+        def _anon_char(match: re.Match) -> str:
+            original = match.group(1)
+            generic_roles = {"narrator", "host", "speaker", "subject", "the subject", "the host", "the narrator", "the survivor"}
+            if original.strip().lower() in generic_roles:
+                return f'"character": "{original}"'
+            # Heuristic: if it looks like a proper name (contains a space and starts with uppercase)
+            if re.match(r"^[A-Z][a-z]+(\s+[A-Z][a-z\-]+)+$", original):
+                return '"character": "the subject"'
+            return f'"character": "{original}"'
+
+        out = re.sub(r'"character"\s*:\s*"([^"]+)"', _anon_char, out)
+        return out
     
     @app.post("/api/agent4/script-to-prompts", response_model=AgentResponse)
     async def script_to_prompts(request: ScriptToPromptsRequest):
@@ -47,9 +75,10 @@ Tone & scope guidelines:
 
 Safety & compliance (Veo v3):
 - Strictly avoid disallowed content: sexual content or nudity (including minors), graphic violence or gore, hate or harassment, extremist or terrorist content, self-harm, illegal activities, weapons instruction, scams or malware, personal data collection, medical or legal advice, political persuasion, or any content violating local laws.
-- Do not depict real private individuals or request biometric identification. Avoid using celebrity likenesses or trademarks without permission.
+- Do not depict or identify real private individuals or request biometric identification. If the user provides a real name, anonymize to a neutral role (e.g., "the host", "the narrator", "the survivor"). Avoid using celebrity likenesses or trademarks without permission.
 - Use brand-agnostic, generic descriptions. Do not include copyrighted text or logos; describe them generically instead.
-- Keep content safe-for-work, non-graphic, and respectful. If the user requests disallowed content, explain briefly that it cannot be produced and offer a safe alternative within the video-making context.
+- Keep content safe-for-work, non-graphic, and respectful. Do not depict human remains, death, or graphic injury. For traumatic events or accidents, focus on environment and respectful implication (e.g., cutaways, abstract visuals) instead of explicit depiction.
+- If the user requests disallowed or sensitive content, briefly state it's not possible and provide a safe alternative within the filmmaking context.
 - Never bypass platform safety filters or provide instructions to do so.
 
 Scene segmentation guidelines:
@@ -110,6 +139,7 @@ Create a complete execution plan covering all scenes with timing, shots, lightin
 
 1. USER COMPLIANCE: Does the plan follow every explicit instruction from the user prompt (formatting, focus, counts, tone, etc.)?
 2. VEO V3 COMPLIANCE: Does every scene and description comply with the Safety & Compliance rules (no sexual content, graphic violence, hate, self-harm, illegal activity, political persuasion, medical/legal advice, personal data, copyrighted logos, or attempts to bypass safety)? If any risk is found, propose a safe rewrite.
+   - Check specifically for: identification of real private individuals (names, likenesses) and any depiction of human remains, death, or graphic injury. Require anonymization and non-explicit treatment.
 3. FRIENDLY YOUTUBE TONE: Is the narration/supportive language warm, collaborative, and clearly tied to YouTube filmmaking?
 4. COMPLETENESS: Are ALL parts of the script covered with the right number of scenes?
 5. TIMING ACCURACY: Does every scene span exactly 8 seconds between start and end timestamps?
@@ -160,7 +190,7 @@ Critic's Feedback:
 
 Task: Create a REFINED, COMPLETE scene breakdown that addresses all issues raised by the Critic.
 Follow every explicit user directive before applying defaults. Maintain a friendly, YouTube-focused tone. Ensure every scene is exactly 8 seconds long, uses valid JSON structure inside its own ```json code block, and includes complete details (duration, character, segments, sound, voiceover, plus any supporting notes).
-Strictly enforce Veo v3 Safety & Compliance: if the script implies unsafe content, reframe with safe, generic, non-graphic alternatives and clearly state the changes in "notes".
+Strictly enforce Veo v3 Safety & Compliance: if the script implies unsafe content, reframe with safe, generic, non-graphic alternatives and clearly state the changes in "notes". Do not identify real private individuals; anonymize roles. Do not depict human remains, death, or graphic injury; use respectful cutaways or abstract visuals instead.
 Output only the final polished breakdown with one code block per scene."""
             
             refined_planner_agent = Agent(
@@ -174,8 +204,8 @@ Output only the final polished breakdown with one code block per scene."""
                 refined_planner_agent, 
                 "Deliver the complete refined scene breakdown."
             )
-            
-            return AgentResponse(success=True, result=final_result.final_output)
+            sanitized = _sanitize_for_veo(final_result.final_output)
+            return AgentResponse(success=True, result=sanitized)
             
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
