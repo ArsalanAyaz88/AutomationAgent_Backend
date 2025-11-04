@@ -5,8 +5,6 @@ Uses Planner-Critic multi-agent pattern for intelligent task decomposition.
 
 from typing import Optional
 import re
-import json
-import logging
 from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
@@ -24,26 +22,35 @@ class AgentResponse(BaseModel):
     error: Optional[str] = None
 
 
-logger = logging.getLogger("agent4.script_to_scene")
-
-
 def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
     """Register Agent 4 routes with Planner-Critic multi-agent system"""
-    # Simple utility to safely get text output from model response object
-    def _safe_get_text(model_response):
-        """Safely extract text from model response, with fallbacks."""
-        try:
-            # Most common case - object with final_output attribute
-            if hasattr(model_response, 'final_output'):
-                return str(model_response.final_output)
-            # Second most common - dictionary with 'final_output' key
-            elif isinstance(model_response, dict) and 'final_output' in model_response:
-                return str(model_response['final_output'])
-            # Just convert whatever we got to string
-            return str(model_response) if model_response is not None else ""
-        except Exception as e:
-            logger.exception("Error extracting text from model response")
-            return "Error processing response"
+    def _sanitize_for_veo(text: str) -> str:
+        if not isinstance(text, str):
+            return text
+        out = text
+        # Soften or remove explicit mentions of human remains/graphic injury
+        replacements = {
+            r"\b(lifeless\s+bodies|bodies|corpse|corpses|dead\s+bodies)\b": "sensitive elements",
+            r"\b(remains)\b": "sensitive elements",
+            r"\b(blood|bloody|gore|gory|severed|mutilated)\b": "damage",
+            r"\b(killed|dead|death)\b": "serious incident",
+        }
+        for pat, repl in replacements.items():
+            out = re.sub(pat, repl, out, flags=re.IGNORECASE)
+
+        # Anonymize private individual names in the JSON character field if present
+        def _anon_char(match: re.Match) -> str:
+            original = match.group(1)
+            generic_roles = {"narrator", "host", "speaker", "subject", "the subject", "the host", "the narrator", "the survivor"}
+            if original.strip().lower() in generic_roles:
+                return f'"character": "{original}"'
+            # Heuristic: if it looks like a proper name (contains a space and starts with uppercase)
+            if re.match(r"^[A-Z][a-z]+(\s+[A-Z][a-z\-]+)+$", original):
+                return '"character": "the subject"'
+            return f'"character": "{original}"'
+
+        out = re.sub(r'"character"\s*:\s*"([^"]+)"', _anon_char, out)
+        return out
     
     @app.post("/api/agent4/script-to-prompts", response_model=AgentResponse)
     async def script_to_prompts(request: ScriptToPromptsRequest):
@@ -82,11 +89,11 @@ Scene segmentation guidelines:
 For each scene provide (within its own Markdown ```json code block):
 1. "scene": Clear label with scene number and descriptive title.
 2. "duration": Start-end time (e.g., "0:00-0:08") — must equal 8 seconds.
-3. "character": Primary speaker or focus (use generic roles like "narrator", "host", "the subject" - NEVER use real names of private individuals).
+3. "character": Primary speaker or focus (e.g., narrator name, subject).
 4. "segments": Nested object covering the full 0-8 second range (e.g., "0-2s", "2-5s", "5-8s") describing visual beats.
 5. "sound": Ambience or SFX.
 6. "voiceover": Spoken line for the scene.
-7. Optional fields (e.g., "camera", "notes") are allowed if helpful. Add a "notes" field with safety information.
+7. Optional fields (e.g., "camera", "notes") are allowed if helpful.
 
 Shot Types: EWS, WS, MS, MCU, CU, ECU
 Angles: Eye level, High, Low, Dutch, Bird's eye, Worm's eye
@@ -101,38 +108,16 @@ Final Output Requirement:
             # ========================================
             # PHASE 1: PLANNER AGENT
             # ========================================
-            planner_instructions = f"""You MUST output a scene-by-scene breakdown immediately. Do NOT provide introductions, explanations, or ask questions.
+            planner_instructions = f"""{request.user_query}
+
+Your task: Break down the provided script into detailed scene-by-scene visual prompts.
 
 {base_framework}
 
-Script:
+Script to analyze:
 {request.script}
 
-REQUIRED OUTPUT FORMAT:
-Start immediately with:
-
-Scene 1 — [Title]
-
-```json
-{{
-  "scene": "Scene 1 - [Title]",
-  "duration": "0:00-0:08",
-  "character": "the narrator",
-  "segments": [...],
-  "sound": "...",
-  "voiceover": "..."
-}}
-```
-
-Scene 2 — [Title]
-
-```json
-{{
-  ...
-}}
-```
-
-Continue with all remaining scenes. OUTPUT SCENES NOW."""
+Create a complete execution plan covering all scenes with timing, shots, lighting, and AI prompts."""
             
             planner_agent = Agent(
                 name="Planner LLM",
@@ -140,10 +125,10 @@ Continue with all remaining scenes. OUTPUT SCENES NOW."""
                 model=model_name,
             )
             
-            # Execute Planner - force immediate scene output
+            # Execute Planner
             planner_result = await Runner.run(
                 planner_agent, 
-                "Scene 1 —"
+                "Create a complete scene-by-scene breakdown for this script."
             )
             initial_plan = planner_result.final_output
             
@@ -190,7 +175,7 @@ Provide constructive critique with specific actionable feedback."""
             # ========================================
             # PHASE 3: REFINED PLANNER AGENT
             # ========================================
-            refined_planner_instructions = f"""Output the FINAL scene breakdown now. No introduction, no explanation.
+            refined_planner_instructions = f"""{request.user_query}
 
 {base_framework}
 
@@ -206,27 +191,7 @@ Critic's Feedback:
 Task: Create a REFINED, COMPLETE scene breakdown that addresses all issues raised by the Critic.
 Follow every explicit user directive before applying defaults. Maintain a friendly, YouTube-focused tone. Ensure every scene is exactly 8 seconds long, uses valid JSON structure inside its own ```json code block, and includes complete details (duration, character, segments, sound, voiceover, plus any supporting notes).
 Strictly enforce Veo v3 Safety & Compliance: if the script implies unsafe content, reframe with safe, generic, non-graphic alternatives and clearly state the changes in "notes". Do not identify real private individuals; anonymize roles. Do not depict human remains, death, or graphic injury; use respectful cutaways or abstract visuals instead.
-
-Output format requirements (mandatory):
-- Output each scene separately, never inside a single JSON array.
-- For each scene, first write a short heading like: Scene X — Title
-- Immediately follow the heading with a fenced code block using exactly this syntax:
-
-```json
-{
-  "scene": "Scene X - Title",
-  "duration": "0:00-0:08",
-  "character": "the narrator", 
-  "segments": [{"time": "0-4s", "visual": "Safe description"}, {"time": "4-8s", "visual": "Safe description"}],
-  "sound": "Description",
-  "voiceover": "Text",
-  "notes": "Safety information" 
-}
-```
-
-- Do not include any other prose between scenes, other than the heading and its JSON block.
-- Ensure JSON is valid (double quotes, commas) and copyable.
-"""
+Output only the final polished breakdown with one code block per scene."""
             
             refined_planner_agent = Agent(
                 name="Refined Planner LLM",
@@ -234,15 +199,13 @@ Output format requirements (mandatory):
                 model=model_name,
             )
             
-            # Execute Refined Planner - force immediate output
+            # Execute Refined Planner
             final_result = await Runner.run(
                 refined_planner_agent, 
-                "Scene 1 —"
+                "Deliver the complete refined scene breakdown."
             )
-            # Use our safe helper to get text
-            result_text = _safe_get_text(final_result)
-            return AgentResponse(success=True, result=result_text)
+            sanitized = _sanitize_for_veo(final_result.final_output)
+            return AgentResponse(success=True, result=sanitized)
             
         except Exception as e:
-            logger.exception("Agent 4 script_to_prompts execution failed")
             raise HTTPException(status_code=500, detail=str(e))
