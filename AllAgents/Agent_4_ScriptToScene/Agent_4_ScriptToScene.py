@@ -28,6 +28,7 @@ def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
     def _sanitize_for_veo(text: str) -> str:
         if not isinstance(text, str):
             return text
+
         out = text
         # Soften or remove explicit mentions of human remains/graphic injury
         replacements = {
@@ -53,20 +54,42 @@ def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
         out = re.sub(r'"character"\s*:\s*"([^"]+)"', _anon_char, out)
         return out
 
+    def _to_text(possible) -> str:
+        try:
+            if isinstance(possible, str):
+                return possible
+            if possible is None:
+                return ""
+            # Common model return types: dict with 'content' or 'final_output'
+            if isinstance(possible, dict):
+                if 'final_output' in possible and isinstance(possible['final_output'], str):
+                    return possible['final_output']
+                if 'content' in possible and isinstance(possible['content'], str):
+                    return possible['content']
+                return json.dumps(possible, ensure_ascii=False)
+            # Fallback generic stringification
+            return str(possible)
+        except Exception:
+            return ""
+
     def _ensure_per_scene_codeblocks(text: str) -> str:
+        if not isinstance(text, str):
+            return text  # do not coerce non-string; upstream may expect original type
         # If it already contains multiple fenced json blocks, keep as-is
         if text.count("```json") >= 2:
             return text
-        # If it's a JSON array of scenes, split to blocks
-        try:
-            data = json.loads(text)
-            if isinstance(data, list):
-                blocks = []
-                for obj in data:
-                    blocks.append("```json\n" + json.dumps(obj, ensure_ascii=False, indent=2) + "\n```")
-                return "\n\n".join(blocks)
-        except Exception:
-            pass
+        # Only try to parse when it looks like a JSON array
+        stripped = text.strip()
+        if stripped.startswith('[') and stripped.endswith(']'):
+            try:
+                data = json.loads(stripped)
+                if isinstance(data, list):
+                    blocks = []
+                    for obj in data:
+                        blocks.append("```json\n" + json.dumps(obj, ensure_ascii=False, indent=2) + "\n```")
+                    return "\n\n".join(blocks)
+            except Exception as e:
+                print("[agent4] JSON array split failed:", repr(e))
         return text
     
     @app.post("/api/agent4/script-to-prompts", response_model=AgentResponse)
@@ -233,9 +256,18 @@ Output format requirements (mandatory):
                 refined_planner_agent, 
                 "Deliver the complete refined scene breakdown."
             )
-            formatted = _ensure_per_scene_codeblocks(final_result.final_output)
-            sanitized = _sanitize_for_veo(formatted)
-            return AgentResponse(success=True, result=sanitized)
+            raw_text = _to_text(getattr(final_result, 'final_output', final_result))
+            try:
+                formatted = _ensure_per_scene_codeblocks(raw_text)
+            except Exception as e:
+                print("[agent4] formatter failed:", repr(e))
+                formatted = raw_text if isinstance(raw_text, str) else _to_text(raw_text)
+            try:
+                sanitized = _sanitize_for_veo(formatted)
+            except Exception as e:
+                print("[agent4] sanitizer failed:", repr(e))
+                sanitized = formatted
+            return AgentResponse(success=True, result=sanitized or "")
             
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
