@@ -6,6 +6,7 @@ Uses Planner-Critic multi-agent pattern for intelligent task decomposition.
 from typing import Optional
 import re
 import json
+import logging
 from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
@@ -21,6 +22,9 @@ class AgentResponse(BaseModel):
     success: bool
     result: str
     error: Optional[str] = None
+
+
+logger = logging.getLogger("agent4.script_to_scene")
 
 
 def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
@@ -260,14 +264,15 @@ Output format requirements (mandatory):
             try:
                 formatted = _ensure_per_scene_codeblocks(raw_text)
             except Exception as e:
-                print("[agent4] formatter failed:", repr(e))
+                logger.exception("Failed to split JSON array into per-scene blocks")
                 formatted = raw_text if isinstance(raw_text, str) else _to_text(raw_text)
             try:
                 sanitized = _sanitize_for_veo(formatted)
             except Exception as e:
-                print("[agent4] sanitizer failed:", repr(e))
+                logger.exception("Failed to sanitize output for Veo compliance")
                 sanitized = formatted
             return AgentResponse(success=True, result=sanitized or "")
             
         except Exception as e:
+            logger.exception("Agent 4 script_to_prompts execution failed")
             raise HTTPException(status_code=500, detail=str(e))
