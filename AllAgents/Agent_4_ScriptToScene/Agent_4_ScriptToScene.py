@@ -101,16 +101,38 @@ Final Output Requirement:
             # ========================================
             # PHASE 1: PLANNER AGENT
             # ========================================
-            planner_instructions = f"""You are a professional scene director. Your job is to immediately convert the script below into detailed visual scene prompts.
-
-DO NOT explain what you can do. DO NOT ask questions. START IMMEDIATELY with the scene breakdown.
+            planner_instructions = f"""You MUST output a scene-by-scene breakdown immediately. Do NOT provide introductions, explanations, or ask questions.
 
 {base_framework}
 
-Script to convert:
+Script:
 {request.script}
 
-IMPORTANT: Output the scene-by-scene breakdown NOW. Each scene should be in its own ```json code block."""
+REQUIRED OUTPUT FORMAT:
+Start immediately with:
+
+Scene 1 — [Title]
+
+```json
+{{
+  "scene": "Scene 1 - [Title]",
+  "duration": "0:00-0:08",
+  "character": "the narrator",
+  "segments": [...],
+  "sound": "...",
+  "voiceover": "..."
+}}
+```
+
+Scene 2 — [Title]
+
+```json
+{{
+  ...
+}}
+```
+
+Continue with all remaining scenes. OUTPUT SCENES NOW."""
             
             planner_agent = Agent(
                 name="Planner LLM",
@@ -118,10 +140,10 @@ IMPORTANT: Output the scene-by-scene breakdown NOW. Each scene should be in its 
                 model=model_name,
             )
             
-            # Execute Planner
+            # Execute Planner - force immediate scene output
             planner_result = await Runner.run(
                 planner_agent, 
-                "Output the complete scene breakdown NOW in the required format. Start with Scene 1."
+                "Scene 1 —"
             )
             initial_plan = planner_result.final_output
             
@@ -168,7 +190,7 @@ Provide constructive critique with specific actionable feedback."""
             # ========================================
             # PHASE 3: REFINED PLANNER AGENT
             # ========================================
-            refined_planner_instructions = f"""You are refining your scene breakdown. Output the final, complete scene-by-scene breakdown immediately.
+            refined_planner_instructions = f"""Output the FINAL scene breakdown now. No introduction, no explanation.
 
 {base_framework}
 
@@ -212,10 +234,10 @@ Output format requirements (mandatory):
                 model=model_name,
             )
             
-            # Execute Refined Planner
+            # Execute Refined Planner - force immediate output
             final_result = await Runner.run(
                 refined_planner_agent, 
-                "Output the final scene breakdown NOW. Start with Scene 1 in a ```json code block."
+                "Scene 1 —"
             )
             # Use our safe helper to get text
             result_text = _safe_get_text(final_result)
