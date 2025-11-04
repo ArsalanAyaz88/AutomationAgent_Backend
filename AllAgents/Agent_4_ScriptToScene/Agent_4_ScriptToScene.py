@@ -5,6 +5,7 @@ Uses Planner-Critic multi-agent pattern for intelligent task decomposition.
 
 from typing import Optional
 import re
+import json
 from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
@@ -51,6 +52,22 @@ def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
 
         out = re.sub(r'"character"\s*:\s*"([^"]+)"', _anon_char, out)
         return out
+
+    def _ensure_per_scene_codeblocks(text: str) -> str:
+        # If it already contains multiple fenced json blocks, keep as-is
+        if text.count("```json") >= 2:
+            return text
+        # If it's a JSON array of scenes, split to blocks
+        try:
+            data = json.loads(text)
+            if isinstance(data, list):
+                blocks = []
+                for obj in data:
+                    blocks.append("```json\n" + json.dumps(obj, ensure_ascii=False, indent=2) + "\n```")
+                return "\n\n".join(blocks)
+        except Exception:
+            pass
+        return text
     
     @app.post("/api/agent4/script-to-prompts", response_model=AgentResponse)
     async def script_to_prompts(request: ScriptToPromptsRequest):
@@ -191,7 +208,19 @@ Critic's Feedback:
 Task: Create a REFINED, COMPLETE scene breakdown that addresses all issues raised by the Critic.
 Follow every explicit user directive before applying defaults. Maintain a friendly, YouTube-focused tone. Ensure every scene is exactly 8 seconds long, uses valid JSON structure inside its own ```json code block, and includes complete details (duration, character, segments, sound, voiceover, plus any supporting notes).
 Strictly enforce Veo v3 Safety & Compliance: if the script implies unsafe content, reframe with safe, generic, non-graphic alternatives and clearly state the changes in "notes". Do not identify real private individuals; anonymize roles. Do not depict human remains, death, or graphic injury; use respectful cutaways or abstract visuals instead.
-Output only the final polished breakdown with one code block per scene."""
+
+Output format requirements (mandatory):
+- Output each scene separately, never inside a single JSON array.
+- For each scene, first write a short heading like: Scene X — Title
+- Immediately follow the heading with a fenced code block using exactly this syntax:
+
+```json
+{ ...valid JSON for that scene... }
+```
+
+- Do not include any other prose between scenes, other than the heading and its JSON block.
+- Ensure JSON is valid (double quotes, commas) and copyable.
+"""
             
             refined_planner_agent = Agent(
                 name="Refined Planner LLM",
@@ -204,7 +233,8 @@ Output only the final polished breakdown with one code block per scene."""
                 refined_planner_agent, 
                 "Deliver the complete refined scene breakdown."
             )
-            sanitized = _sanitize_for_veo(final_result.final_output)
+            formatted = _ensure_per_scene_codeblocks(final_result.final_output)
+            sanitized = _sanitize_for_veo(formatted)
             return AgentResponse(success=True, result=sanitized)
             
         except Exception as e:
