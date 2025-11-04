@@ -101,16 +101,16 @@ Final Output Requirement:
             # ========================================
             # PHASE 1: PLANNER AGENT
             # ========================================
-            planner_instructions = f"""{request.user_query}
+            planner_instructions = f"""You are a professional scene director. Your job is to immediately convert the script below into detailed visual scene prompts.
 
-Your task: Break down the provided script into detailed scene-by-scene visual prompts.
+DO NOT explain what you can do. DO NOT ask questions. START IMMEDIATELY with the scene breakdown.
 
 {base_framework}
 
-Script to analyze:
+Script to convert:
 {request.script}
 
-Create a complete execution plan covering all scenes with timing, shots, lighting, and AI prompts."""
+IMPORTANT: Output the scene-by-scene breakdown NOW. Each scene should be in its own ```json code block."""
             
             planner_agent = Agent(
                 name="Planner LLM",
@@ -121,7 +121,7 @@ Create a complete execution plan covering all scenes with timing, shots, lightin
             # Execute Planner
             planner_result = await Runner.run(
                 planner_agent, 
-                "Create a complete scene-by-scene breakdown for this script."
+                "Output the complete scene breakdown NOW in the required format. Start with Scene 1."
             )
             initial_plan = planner_result.final_output
             
@@ -168,7 +168,7 @@ Provide constructive critique with specific actionable feedback."""
             # ========================================
             # PHASE 3: REFINED PLANNER AGENT
             # ========================================
-            refined_planner_instructions = f"""{request.user_query}
+            refined_planner_instructions = f"""You are refining your scene breakdown. Output the final, complete scene-by-scene breakdown immediately.
 
 {base_framework}
 
@@ -215,7 +215,7 @@ Output format requirements (mandatory):
             # Execute Refined Planner
             final_result = await Runner.run(
                 refined_planner_agent, 
-                "Deliver the complete refined scene breakdown."
+                "Output the final scene breakdown NOW. Start with Scene 1 in a ```json code block."
             )
             # Use our safe helper to get text
             result_text = _safe_get_text(final_result)
