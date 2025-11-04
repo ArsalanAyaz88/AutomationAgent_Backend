@@ -29,72 +29,21 @@ logger = logging.getLogger("agent4.script_to_scene")
 
 def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
     """Register Agent 4 routes with Planner-Critic multi-agent system"""
-    def _sanitize_for_veo(text: str) -> str:
-        if not isinstance(text, str):
-            return text
-
-        out = text
-        # Soften or remove explicit mentions of human remains/graphic injury
-        replacements = {
-            r"\b(lifeless\s+bodies|bodies|corpse|corpses|dead\s+bodies)\b": "sensitive elements",
-            r"\b(remains)\b": "sensitive elements",
-            r"\b(blood|bloody|gore|gory|severed|mutilated)\b": "damage",
-            r"\b(killed|dead|death)\b": "serious incident",
-        }
-        for pat, repl in replacements.items():
-            out = re.sub(pat, repl, out, flags=re.IGNORECASE)
-
-        # Anonymize private individual names in the JSON character field if present
-        def _anon_char(match: re.Match) -> str:
-            original = match.group(1)
-            generic_roles = {"narrator", "host", "speaker", "subject", "the subject", "the host", "the narrator", "the survivor"}
-            if original.strip().lower() in generic_roles:
-                return f'"character": "{original}"'
-            # Heuristic: if it looks like a proper name (contains a space and starts with uppercase)
-            if re.match(r"^[A-Z][a-z]+(\s+[A-Z][a-z\-]+)+$", original):
-                return '"character": "the subject"'
-            return f'"character": "{original}"'
-
-        out = re.sub(r'"character"\s*:\s*"([^"]+)"', _anon_char, out)
-        return out
-
-    def _to_text(possible) -> str:
+    # Simple utility to safely get text output from model response object
+    def _safe_get_text(model_response):
+        """Safely extract text from model response, with fallbacks."""
         try:
-            if isinstance(possible, str):
-                return possible
-            if possible is None:
-                return ""
-            # Common model return types: dict with 'content' or 'final_output'
-            if isinstance(possible, dict):
-                if 'final_output' in possible and isinstance(possible['final_output'], str):
-                    return possible['final_output']
-                if 'content' in possible and isinstance(possible['content'], str):
-                    return possible['content']
-                return json.dumps(possible, ensure_ascii=False)
-            # Fallback generic stringification
-            return str(possible)
-        except Exception:
-            return ""
-
-    def _ensure_per_scene_codeblocks(text: str) -> str:
-        if not isinstance(text, str):
-            return text  # do not coerce non-string; upstream may expect original type
-        # If it already contains multiple fenced json blocks, keep as-is
-        if text.count("```json") >= 2:
-            return text
-        # Only try to parse when it looks like a JSON array
-        stripped = text.strip()
-        if stripped.startswith('[') and stripped.endswith(']'):
-            try:
-                data = json.loads(stripped)
-                if isinstance(data, list):
-                    blocks = []
-                    for obj in data:
-                        blocks.append("```json\n" + json.dumps(obj, ensure_ascii=False, indent=2) + "\n```")
-                    return "\n\n".join(blocks)
-            except Exception as e:
-                print("[agent4] JSON array split failed:", repr(e))
-        return text
+            # Most common case - object with final_output attribute
+            if hasattr(model_response, 'final_output'):
+                return str(model_response.final_output)
+            # Second most common - dictionary with 'final_output' key
+            elif isinstance(model_response, dict) and 'final_output' in model_response:
+                return str(model_response['final_output'])
+            # Just convert whatever we got to string
+            return str(model_response) if model_response is not None else ""
+        except Exception as e:
+            logger.exception("Error extracting text from model response")
+            return "Error processing response"
     
     @app.post("/api/agent4/script-to-prompts", response_model=AgentResponse)
     async def script_to_prompts(request: ScriptToPromptsRequest):
@@ -133,11 +82,11 @@ Scene segmentation guidelines:
 For each scene provide (within its own Markdown ```json code block):
 1. "scene": Clear label with scene number and descriptive title.
 2. "duration": Start-end time (e.g., "0:00-0:08") — must equal 8 seconds.
-3. "character": Primary speaker or focus (e.g., narrator name, subject).
+3. "character": Primary speaker or focus (use generic roles like "narrator", "host", "the subject" - NEVER use real names of private individuals).
 4. "segments": Nested object covering the full 0-8 second range (e.g., "0-2s", "2-5s", "5-8s") describing visual beats.
 5. "sound": Ambience or SFX.
 6. "voiceover": Spoken line for the scene.
-7. Optional fields (e.g., "camera", "notes") are allowed if helpful.
+7. Optional fields (e.g., "camera", "notes") are allowed if helpful. Add a "notes" field with safety information.
 
 Shot Types: EWS, WS, MS, MCU, CU, ECU
 Angles: Eye level, High, Low, Dutch, Bird's eye, Worm's eye
@@ -242,7 +191,15 @@ Output format requirements (mandatory):
 - Immediately follow the heading with a fenced code block using exactly this syntax:
 
 ```json
-{ ...valid JSON for that scene... }
+{
+  "scene": "Scene X - Title",
+  "duration": "0:00-0:08",
+  "character": "the narrator", 
+  "segments": [{"time": "0-4s", "visual": "Safe description"}, {"time": "4-8s", "visual": "Safe description"}],
+  "sound": "Description",
+  "voiceover": "Text",
+  "notes": "Safety information" 
+}
 ```
 
 - Do not include any other prose between scenes, other than the heading and its JSON block.
@@ -260,18 +217,9 @@ Output format requirements (mandatory):
                 refined_planner_agent, 
                 "Deliver the complete refined scene breakdown."
             )
-            raw_text = _to_text(getattr(final_result, 'final_output', final_result))
-            try:
-                formatted = _ensure_per_scene_codeblocks(raw_text)
-            except Exception as e:
-                logger.exception("Failed to split JSON array into per-scene blocks")
-                formatted = raw_text if isinstance(raw_text, str) else _to_text(raw_text)
-            try:
-                sanitized = _sanitize_for_veo(formatted)
-            except Exception as e:
-                logger.exception("Failed to sanitize output for Veo compliance")
-                sanitized = formatted
-            return AgentResponse(success=True, result=sanitized or "")
+            # Use our safe helper to get text
+            result_text = _safe_get_text(final_result)
+            return AgentResponse(success=True, result=result_text)
             
         except Exception as e:
             logger.exception("Agent 4 script_to_prompts execution failed")
