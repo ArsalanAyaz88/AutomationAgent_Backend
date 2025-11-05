@@ -15,9 +15,15 @@ class TitleAuditRequest(BaseModel):
     user_query: str = "Analyze these videos and extract winning patterns"
 
 
+class VideoAudit(BaseModel):
+    video_url: str
+    audit_report: str
+
+
 class AgentResponse(BaseModel):
     success: bool
-    result: str
+    individual_audits: List[VideoAudit]
+    cross_video_summary: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -30,87 +36,91 @@ def register_agent2_routes(app, create_agent_client_func, youtube_tools):
         Agent 2: Video-Level Auditor - "The Content Detective"
         Deconstructs high-performing videos to identify what makes them work.
         Analyzes titles, thumbnails, hooks, storytelling structure, and content patterns.
+        Each video is audited separately with individual reports.
         """
         try:
             model_name = create_agent_client_func("agent2")
-            # Reusable audit framework (concise)
+            
+            # Reusable audit framework for individual videos
             base_framework = """You are "The Content Detective" — a YouTube video forensics analyst.
 
-Mission: Perform deep audits of videos to extract winning patterns across titles, thumbnails, hooks, storytelling, engagement, and SEO; then synthesize repeatable formulas.
+Mission: Perform a deep audit of this video to extract winning patterns across titles, thumbnails, hooks, storytelling, engagement, and SEO.
 
 Output expectations:
-- Per-video structured findings (metadata, title/thumbnail forensics, hook analysis, storytelling arc, engagement patterns, format classification, keywords, winning elements, verdict)
-- Cross-video pattern summary with reusable templates and recommendations
+- Structured findings including:
+  * Video metadata (title, views, likes, publish date, channel info)
+  * Title/thumbnail forensics (pattern analysis, psychological triggers)
+  * Hook analysis (first 30 seconds breakdown)
+  * Storytelling arc (structure, pacing, retention tactics)
+  * Engagement patterns (CTR indicators, comment themes)
+  * Format classification (tutorial, vlog, review, etc.)
+  * SEO keywords and tags
+  * Winning elements (what makes this video successful)
+  * Overall verdict and recommendations
 """
 
-            videos_list = "\n".join([f"- {url}" for url in request.video_urls])
-
+            individual_audits = []
+            
             # ========================================
-            # PHASE 1: PLANNER AGENT (uses tools)
+            # AUDIT EACH VIDEO SEPARATELY
             # ========================================
-            planner_instructions = f"""{request.user_query}
+            for video_url in request.video_urls:
+                # PHASE 1: Initial Audit with Tools
+                planner_instructions = f"""{request.user_query}
 
-Videos to analyze:
-{videos_list}
+Video to analyze: {video_url}
 
 {base_framework}
 
-Task: Run an initial comprehensive audit for each video (using available tools as needed) and produce a first-pass synthesis of cross-video patterns and templates."""
+Task: Perform a comprehensive audit of this single video using available tools. Produce a detailed, structured report."""
 
-            planner_agent = Agent(
-                name="Planner LLM",
-                instructions=planner_instructions,
-                model=model_name,
-                tools=youtube_tools,
-            )
+                planner_agent = Agent(
+                    name="Video Auditor",
+                    instructions=planner_instructions,
+                    model=model_name,
+                    tools=youtube_tools,
+                )
 
-            planner_result = await Runner.run(
-                planner_agent,
-                "Perform the audit and produce a structured initial report."
-            )
-            initial_report = planner_result.final_output
+                planner_result = await Runner.run(
+                    planner_agent,
+                    f"Audit the video at {video_url}"
+                )
+                initial_report = planner_result.final_output
 
-            # ========================================
-            # PHASE 2: CRITIC AGENT
-            # ========================================
-            critic_instructions = f"""You are a Critic LLM. Review the audit for:
+                # PHASE 2: Critic Review
+                critic_instructions = f"""You are a Critic LLM. Review this video audit for:
 
-1. USER COMPLIANCE: Follows prompt and framework; one structured report per video + pattern summary
-2. COMPLETENESS: Metadata, title/thumbnail forensics, hook analysis, storytelling arc, engagement patterns, format, keywords, winning elements, verdict
-3. EVIDENCE USE: Specific observations, quotes, and data where applicable
-4. SYNTHESIS: Clear cross-video patterns, repeatable templates, and practical recommendations
-5. CLARITY: Actionable, unambiguous, minimal fluff
-6. ISSUES & RECOMMENDATIONS: Specific fixes and additions
+1. COMPLETENESS: All required sections covered (metadata, title/thumbnail, hook, storytelling, engagement, format, keywords, winning elements, verdict)
+2. EVIDENCE: Specific observations and data from the video
+3. DEPTH: Actionable insights, not surface-level observations
+4. CLARITY: Well-structured and easy to understand
+5. ISSUES: Missing elements or areas needing improvement
 
-Original inputs (videos):
-{videos_list}
+Video: {video_url}
 
 Audit to review:
 {initial_report}
 
-Provide concise critique plus actionable recommendations."""
+Provide concise critique with actionable recommendations."""
 
-            critic_agent = Agent(
-                name="Critic LLM",
-                instructions=critic_instructions,
-                model=model_name,
-            )
+                critic_agent = Agent(
+                    name="Audit Critic",
+                    instructions=critic_instructions,
+                    model=model_name,
+                )
 
-            critic_result = await Runner.run(
-                critic_agent,
-                "Review the audit and provide detailed feedback."
-            )
-            critique = critic_result.final_output
+                critic_result = await Runner.run(
+                    critic_agent,
+                    "Review and provide feedback on the audit."
+                )
+                critique = critic_result.final_output
 
-            # ========================================
-            # PHASE 3: REFINED PLANNER AGENT
-            # ========================================
-            refined_planner_instructions = f"""{request.user_query}
+                # PHASE 3: Refined Audit
+                refined_instructions = f"""{request.user_query}
+
+Video: {video_url}
 
 {base_framework}
-
-Videos to analyze:
-{videos_list}
 
 Initial Audit:
 {initial_report}
@@ -118,20 +128,64 @@ Initial Audit:
 Critic's Feedback:
 {critique}
 
-Task: Produce a REFINED, COMPLETE audit that addresses all issues. Ensure per-video reports are thorough and the cross-video synthesis includes clear templates and prioritized recommendations. Output only the final polished audit."""
+Task: Produce a REFINED, COMPLETE audit addressing all feedback. Output only the final polished audit report."""
 
-            refined_planner_agent = Agent(
-                name="Refined Planner LLM",
-                instructions=refined_planner_instructions,
-                model=model_name,
+                refined_agent = Agent(
+                    name="Refined Auditor",
+                    instructions=refined_instructions,
+                    model=model_name,
+                )
+
+                final_result = await Runner.run(
+                    refined_agent,
+                    "Deliver the refined audit."
+                )
+                
+                individual_audits.append(VideoAudit(
+                    video_url=video_url,
+                    audit_report=final_result.final_output
+                ))
+
+            # ========================================
+            # OPTIONAL: CROSS-VIDEO PATTERN SUMMARY
+            # ========================================
+            cross_video_summary = None
+            if len(request.video_urls) > 1:
+                all_audits_text = "\n\n".join([
+                    f"VIDEO {i+1}: {audit.video_url}\n{audit.audit_report}"
+                    for i, audit in enumerate(individual_audits)
+                ])
+                
+                summary_instructions = f"""You are a Pattern Analyst. Review these individual video audits and identify:
+
+1. Common success patterns across all videos
+2. Repeatable formulas for titles, thumbnails, hooks
+3. Shared storytelling techniques
+4. Universal engagement tactics
+5. Actionable recommendations for creating similar content
+
+Individual Audits:
+{all_audits_text}
+
+Task: Synthesize cross-video patterns into actionable templates and recommendations."""
+
+                summary_agent = Agent(
+                    name="Pattern Synthesizer",
+                    instructions=summary_instructions,
+                    model=model_name,
+                )
+
+                summary_result = await Runner.run(
+                    summary_agent,
+                    "Identify patterns and create reusable templates."
+                )
+                cross_video_summary = summary_result.final_output
+
+            return AgentResponse(
+                success=True,
+                individual_audits=individual_audits,
+                cross_video_summary=cross_video_summary
             )
-
-            final_result = await Runner.run(
-                refined_planner_agent,
-                "Deliver the refined comprehensive audit."
-            )
-
-            return AgentResponse(success=True, result=final_result.final_output)
                 
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
