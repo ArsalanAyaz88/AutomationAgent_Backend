@@ -173,6 +173,7 @@ from AllAgents.Agent_3_ScriptGenerator.Agent_3_ScriptGenerator import register_a
 from AllAgents.Agent_4_ScriptToScene.Agent_4_ScriptToScene import register_agent4_routes
 from AllAgents.Agent_5_generateIdeas.Agent_5_generateIdeas import register_agent5_routes
 from AllAgents.Agent_6_roadmap.Agent_6_roadmap import register_agent6_routes
+from AllAgents.fifty_videos_fetcher.fiftyVideosAgent import register_fifty_videos_routes
 
 # Register all agent routes with the app
 register_agent1_routes(app, create_agent_client, YOUTUBE_TOOLS)
@@ -181,6 +182,7 @@ register_agent3_routes(app, create_agent_client, YOUTUBE_TOOLS)
 register_agent4_routes(app, create_agent_client, YOUTUBE_TOOLS)
 register_agent5_routes(app, create_agent_client, YOUTUBE_TOOLS)
 register_agent6_routes(app, create_agent_client, YOUTUBE_TOOLS)
+register_fifty_videos_routes(app, create_agent_client, YOUTUBE_TOOLS)
 
 
 def _ensure_saved_responses_collection():
@@ -353,7 +355,8 @@ async def root():
             "agent3": "Script Writer - Generate scripts from audit data",
             "agent4": "Script to Prompts - Convert scripts to scene prompts",
             "agent5": "Ideas Generator - Generate 3 winning titles & thumbnails",
-            "agent6": "Roadmap Generator - 30-video roadmap with titles & thumbnails"
+            "agent6": "Roadmap Generator - 30-video roadmap with titles & thumbnails",
+            "fifty_videos": "50 Videos Fetcher - Get latest 50 video links from a channel"
         },
         "endpoints": {
             "POST /api/agent1/audit-channel": "Channel auditing",
@@ -361,7 +364,8 @@ async def root():
             "POST /api/agent3/generate-script": "Script generation",
             "POST /api/agent4/script-to-prompts": "Script to visual prompts",
             "POST /api/agent5/generate-ideas": "Title & thumbnail ideas",
-            "POST /api/agent6/generate-roadmap": "Content roadmap generation"
+            "POST /api/agent6/generate-roadmap": "Content roadmap generation",
+            "POST /api/fifty-videos/fetch-links": "Fetch 50 video links from channel"
         }
     }
 
