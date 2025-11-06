@@ -4,9 +4,13 @@ All 7 agents now use YOUR channel analytics automatically!
 """
 
 from typing import Optional, Dict, Any, List
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile, File
 from pydantic import BaseModel
 from agents import Agent, Runner
+from datetime import datetime
+import re
+import PyPDF2
+import io
 
 from per_channel_analytics_Agents.analytics_enhanced_agents import (
     analytics_context,
@@ -60,6 +64,20 @@ class UnifiedRoadmapRequest(AnalyticsAwareRequest):
     focus_area: Optional[str] = None
 
 
+class ScriptUploadRequest(BaseModel):
+    """Request model for uploading scripts"""
+    script_title: str
+    script_content: str  # Text extracted from PDF or direct text input
+    user_id: Optional[str] = "default"
+
+
+class ScriptToSceneRequest(BaseModel):
+    """Request model for converting script to scene prompts"""
+    script_id: str
+    user_id: Optional[str] = "default"
+    user_query: Optional[str] = "Convert this script into detailed scene-by-scene prompts"
+
+
 class UnifiedResponse(BaseModel):
     success: bool
     result: str
@@ -67,6 +85,15 @@ class UnifiedResponse(BaseModel):
     analytics_used: bool = False
     channel_info: Optional[Dict[str, Any]] = None
     video_analytics: Optional[Dict[str, Any]] = None  # Top 30 videos data for frontend display
+
+
+class ScriptResponse(BaseModel):
+    """Response model for script operations"""
+    success: bool
+    script_id: Optional[str] = None
+    script_title: Optional[str] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
 
 
 # ============================================
@@ -194,6 +221,55 @@ def register_unified_analytics_routes(app, create_agent_client_func, youtube_too
         except Exception as e:
             print(f"Error getting video analytics: {e}")
             return None
+    
+    
+    # ============================================
+    # SCRIPT DATABASE & HELPERS
+    # ============================================
+    
+    # Initialize scripts collection
+    scripts_collection = analytics_context.tracker.db["uploaded_scripts"]
+    
+    def _sanitize_for_veo(text: str) -> str:
+        """Sanitize content for Veo v3 compliance"""
+        if not isinstance(text, str):
+            return text
+        out = text
+        # Soften or remove explicit mentions of human remains/graphic injury
+        replacements = {
+            r"\b(lifeless\s+bodies|bodies|corpse|corpses|dead\s+bodies)\b": "sensitive elements",
+            r"\b(remains)\b": "sensitive elements",
+            r"\b(blood|bloody|gore|gory|severed|mutilated)\b": "damage",
+            r"\b(killed|dead|death)\b": "serious incident",
+        }
+        for pat, repl in replacements.items():
+            out = re.sub(pat, repl, out, flags=re.IGNORECASE)
+
+        # Anonymize private individual names in the JSON character field if present
+        def _anon_char(match: re.Match) -> str:
+            original = match.group(1)
+            generic_roles = {"narrator", "host", "speaker", "subject", "the subject", "the host", "the narrator", "the survivor"}
+            if original.strip().lower() in generic_roles:
+                return f'"character": "{original}"'
+            # Heuristic: if it looks like a proper name (contains a space and starts with uppercase)
+            if re.match(r"^[A-Z][a-z]+(\s+[A-Z][a-z\-]+)+$", original):
+                return '"character": "the subject"'
+            return f'"character": "{original}"'
+
+        out = re.sub(r'"character"\s*:\s*"([^"]+)"', _anon_char, out)
+        return out
+    
+    
+    async def extract_text_from_pdf(file_content: bytes) -> str:
+        """Extract text from PDF file"""
+        try:
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+            return text.strip()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to extract text from PDF: {str(e)}")
     
     
     # ============================================
@@ -349,17 +425,14 @@ OUTPUT: Pure script text only - exactly what should be said in the video, nothin
             if not script or script.strip() == "":
                 script = "⚠️ Failed to generate script. Please try again or check backend logs."
             
-            # Get video analytics data for frontend display
-            video_analytics = None
-            if has_analytics and channel_id:
-                video_analytics = await get_video_analytics_data(channel_id, request.user_id)
-            
+            # Script generator is topic-based, doesn't analyze specific videos
+            # So we don't send video_analytics data
             return UnifiedResponse(
                 success=True,
                 result=script,
                 analytics_used=has_analytics,
                 channel_info=channel_info,
-                video_analytics=video_analytics
+                video_analytics=None  # Script generator doesn't use video analytics
             )
             
         except Exception as e:
@@ -601,7 +674,291 @@ Format as a structured roadmap.
     
     
     # ============================================
-    # 5. QUICK ANALYTICS STATUS
+    # 5. SCRIPT UPLOAD & MANAGEMENT (CRUD)
+    # ============================================
+    
+    @app.post("/api/unified/upload-script-pdf")
+    async def upload_script_pdf(file: UploadFile = File(...), user_id: str = "default"):
+        """
+        📄 Upload PDF script for scene conversion
+        Extracts text from PDF and stores in database
+        """
+        try:
+            if not file.filename.endswith('.pdf'):
+                raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+            
+            # Read PDF content
+            pdf_content = await file.read()
+            
+            # Extract text from PDF
+            script_text = await extract_text_from_pdf(pdf_content)
+            
+            if not script_text:
+                raise HTTPException(status_code=400, detail="No text found in PDF")
+            
+            # Generate script ID
+            from bson.objectid import ObjectId
+            script_id = str(ObjectId())
+            
+            # Store in database
+            script_doc = {
+                "script_id": script_id,
+                "script_title": file.filename.replace('.pdf', ''),
+                "script_content": script_text,
+                "user_id": user_id,
+                "uploaded_at": datetime.utcnow(),
+                "file_type": "pdf"
+            }
+            
+            scripts_collection.insert_one(script_doc)
+            
+            return ScriptResponse(
+                success=True,
+                script_id=script_id,
+                script_title=script_doc["script_title"],
+                message=f"✅ Script uploaded successfully! {len(script_text)} characters extracted."
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+    
+    
+    @app.post("/api/unified/upload-script-text", response_model=ScriptResponse)
+    async def upload_script_text(request: ScriptUploadRequest):
+        """
+        📝 Upload text script for scene conversion
+        Stores text directly in database
+        """
+        try:
+            from bson.objectid import ObjectId
+            script_id = str(ObjectId())
+            
+            # Store in database
+            script_doc = {
+                "script_id": script_id,
+                "script_title": request.script_title,
+                "script_content": request.script_content,
+                "user_id": request.user_id,
+                "uploaded_at": datetime.utcnow(),
+                "file_type": "text"
+            }
+            
+            scripts_collection.insert_one(script_doc)
+            
+            return ScriptResponse(
+                success=True,
+                script_id=script_id,
+                script_title=request.script_title,
+                message=f"✅ Script uploaded successfully! {len(request.script_content)} characters."
+            )
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+    
+    
+    @app.get("/api/unified/get-scripts")
+    async def get_scripts(user_id: str = "default"):
+        """
+        📚 Get all uploaded scripts for user
+        """
+        try:
+            scripts = list(scripts_collection.find(
+                {"user_id": user_id},
+                {"_id": 0}
+            ).sort("uploaded_at", -1))
+            
+            return {
+                "success": True,
+                "count": len(scripts),
+                "scripts": scripts
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    
+    @app.get("/api/unified/get-script/{script_id}")
+    async def get_script(script_id: str, user_id: str = "default"):
+        """
+        📄 Get specific script by ID
+        """
+        try:
+            script = scripts_collection.find_one(
+                {"script_id": script_id, "user_id": user_id},
+                {"_id": 0}
+            )
+            
+            if not script:
+                raise HTTPException(status_code=404, detail="Script not found")
+            
+            return {
+                "success": True,
+                "script": script
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    @app.delete("/api/unified/delete-script/{script_id}")
+    async def delete_script(script_id: str, user_id: str = "default"):
+        """
+        🗑️ Delete uploaded script
+        """
+        try:
+            result = scripts_collection.delete_one({
+                "script_id": script_id,
+                "user_id": user_id
+            })
+            
+            if result.deleted_count == 0:
+                raise HTTPException(status_code=404, detail="Script not found")
+            
+            return {
+                "success": True,
+                "message": "Script deleted successfully"
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    # ============================================
+    # 6. SCRIPT-TO-SCENE CONVERTER (Single Agent)
+    # ============================================
+    
+    @app.post("/api/unified/script-to-scene", response_model=UnifiedResponse)
+    async def script_to_scene(request: ScriptToSceneRequest):
+        """
+        🎬 Script-to-Scene Converter - "The Director"
+        
+        Converts uploaded script into detailed scene-by-scene video generation prompts.
+        Uses single simplified agent (no planner-critic complexity).
+        
+        Features:
+        - Reads complete script from database for full context
+        - Converts each line/beat to video generation prompt
+        - 8-second scenes with detailed visual descriptions
+        - Veo v3 compliant and safety-focused
+        - JSON output for easy integration
+        """
+        try:
+            # Get script from database
+            script = scripts_collection.find_one(
+                {"script_id": request.script_id, "user_id": request.user_id},
+                {"_id": 0}
+            )
+            
+            if not script:
+                raise HTTPException(status_code=404, detail="Script not found")
+            
+            script_content = script.get("script_content", "")
+            script_title = script.get("script_title", "Untitled")
+            
+            if not script_content:
+                raise HTTPException(status_code=400, detail="Script content is empty")
+            
+            # Create agent model
+            model_name = create_agent_client_func("agent4")
+            
+            # Comprehensive instructions (copied from Agent_4_ScriptToScene)
+            agent_instructions = f"""{request.user_query}
+
+SCRIPT TITLE: {script_title}
+
+Your task: Break down the provided script into detailed scene-by-scene visual prompts for video generation.
+
+SCENE BREAKDOWN FRAMEWORK:
+
+Priority order:
+- User-provided instructions, constraints, or preferences take absolute precedence over defaults.
+- Only fall back to the guidelines below when the user prompt is silent on a requirement.
+
+Tone & scope guidelines:
+- Communicate in a warm, encouraging, YouTube-savvy voice (think collaborative creative partner).
+- Keep discussion anchored to YouTube video production, storytelling, or visual execution. Avoid unrelated topics.
+
+Safety & compliance (Veo v3):
+- Strictly avoid disallowed content: sexual content or nudity (including minors), graphic violence or gore, hate or harassment, extremist or terrorist content, self-harm, illegal activities, weapons instruction, scams or malware, personal data collection, medical or legal advice, political persuasion, or any content violating local laws.
+- Do not depict or identify real private individuals or request biometric identification. If the user provides a real name, anonymize to a neutral role (e.g., "the host", "the narrator", "the survivor"). Avoid using celebrity likenesses or trademarks without permission.
+- Use brand-agnostic, generic descriptions. Do not include copyrighted text or logos; describe them generically instead.
+- Keep content safe-for-work, non-graphic, and respectful. Do not depict human remains, death, or graphic injury. For traumatic events or accidents, focus on environment and respectful implication (e.g., cutaways, abstract visuals) instead of explicit depiction.
+- If the user requests disallowed or sensitive content, briefly state it's not possible and provide a safe alternative within the filmmaking context.
+- Never bypass platform safety filters or provide instructions to do so.
+
+Scene segmentation guidelines:
+- Analyze the script's narrative shifts, locations, emotions, or beat changes.
+- Create as many scenes as required based on the script (one scene if appropriate, otherwise multiple scenes).
+- Maintain a continuous timeline. Each scene must span exactly 8 seconds (no more, no less) from its start to end timestamp.
+
+For each scene provide (within its own Markdown ```json code block):
+1. "scene": Clear label with scene number and descriptive title.
+2. "duration": Start-end time (e.g., "0:00-0:08") — must equal 8 seconds.
+3. "character": Primary speaker or focus (e.g., narrator name, subject).
+4. "segments": Nested object covering the full 0-8 second range (e.g., "0-2s", "2-5s", "5-8s") describing visual beats.
+5. "sound": Ambience or SFX.
+6. "voiceover": Spoken line for the scene.
+7. Optional fields (e.g., "camera", "notes") are allowed if helpful.
+
+Shot Types: EWS, WS, MS, MCU, CU, ECU
+Angles: Eye level, High, Low, Dutch, Bird's eye, Worm's eye
+Movement: Static, Pan, Tilt, Dolly, Tracking, Crane, Handheld, Gimbal
+Lighting: Three-point, Natural, High key, Low key, Silhouette
+Pacing: Fast (3-8s), Balanced (8-15s), Cinematic (15-30s)
+
+Final Output Requirement:
+- Present each scene as a separate ```json code block so it can be copied easily.
+- Ensure scene objects are valid JSON (double quotes, comma-separated pairs, etc.).
+
+COMPLETE SCRIPT TO ANALYZE:
+{script_content}
+
+Now, create a complete scene-by-scene breakdown covering the entire script. Each scene should be 8 seconds with detailed visual descriptions, camera work, lighting, sound, and voiceover. Output each scene in its own JSON code block."""
+            
+            # Create and run agent
+            agent = Agent(
+                name="ScriptToScene Director",
+                instructions=agent_instructions,
+                model=model_name,
+            )
+            
+            # Execute agent
+            result = await Runner.run(
+                agent,
+                f"Create detailed scene-by-scene video generation prompts for: {script_title}"
+            )
+            
+            # Get result and sanitize
+            scene_breakdown = result.final_output if hasattr(result, 'final_output') else ""
+            
+            if not scene_breakdown or scene_breakdown.strip() == "":
+                scene_breakdown = "⚠️ Failed to generate scene breakdown. Please try again."
+            
+            # Sanitize for Veo v3 compliance
+            sanitized_result = _sanitize_for_veo(scene_breakdown)
+            
+            return UnifiedResponse(
+                success=True,
+                result=sanitized_result,
+                analytics_used=False,  # Script-to-scene doesn't use channel analytics
+                channel_info=None,
+                video_analytics=None
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Scene conversion failed: {str(e)}")
+    
+    
+    # ============================================
+    # 7. ANALYTICS STATUS
     # ============================================
     @app.get("/api/unified/analytics-status")
     async def get_analytics_status(user_id: str = "default"):
