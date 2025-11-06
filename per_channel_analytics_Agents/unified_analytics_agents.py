@@ -98,7 +98,10 @@ def register_unified_analytics_routes(app, create_agent_client_func, youtube_too
     
     
     async def get_video_analytics_data(channel_id: str, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get detailed video analytics for frontend display"""
+        """Get detailed video analytics for frontend display
+        
+        Shows up to 30 videos, or all available if channel has fewer than 30
+        """
         try:
             # Get latest analytics from MongoDB
             analytics = analytics_context.tracker.analytics_collection.find_one(
@@ -110,23 +113,57 @@ def register_unified_analytics_routes(app, create_agent_client_func, youtube_too
                 return None
             
             recent_videos = analytics.get('recent_videos', [])
+            total_videos = len(recent_videos)
             
-            # Get top 30 by views
+            # If channel has fewer than 30 videos, show all; otherwise show top 30
+            max_videos = min(30, total_videos)
+            
+            # Calculate combined scores: recency + performance
+            from datetime import datetime
+            if recent_videos:
+                # Parse dates and calculate days ago
+                for video in recent_videos:
+                    try:
+                        pub_date = datetime.fromisoformat(video['published_at'].replace('Z', '+00:00'))
+                        days_ago = (datetime.now(pub_date.tzinfo) - pub_date).days
+                        # Recency score: newer videos get higher scores (0-1 range)
+                        video['recency_score'] = max(0, 1 - (days_ago / 365))
+                    except:
+                        video['recency_score'] = 0.5
+                
+                # Normalize metrics for scoring
+                max_views = max(video.get('views', 0) for video in recent_videos) or 1
+                max_engagement = max(video.get('engagement_rate', 0) for video in recent_videos) or 1
+                
+                for video in recent_videos:
+                    video['views_score'] = video.get('views', 0) / max_views
+                    video['engagement_score'] = video.get('engagement_rate', 0) / max_engagement
+                    
+                    # Combined score: 40% recency + 40% views + 20% engagement
+                    video['combined_score'] = (
+                        0.4 * video['recency_score'] + 
+                        0.4 * video['views_score'] + 
+                        0.2 * video['engagement_score']
+                    )
+            
+            # Get top videos by combined score (recency + performance)
             top_performing = sorted(
                 recent_videos, 
-                key=lambda x: x.get('views', 0), 
+                key=lambda x: x.get('combined_score', 0), 
                 reverse=True
-            )[:30]
+            )[:max_videos]
             
-            # Get top 30 by engagement
+            # Get high engagement videos (also considering recency)
             high_engagement = sorted(
                 recent_videos,
-                key=lambda x: x.get('engagement_rate', 0),
+                key=lambda x: (0.5 * x.get('engagement_score', 0) + 0.5 * x.get('recency_score', 0)),
                 reverse=True
-            )[:30]
+            )[:max_videos]
             
             return {
-                "total_videos_analyzed": len(recent_videos),
+                "total_videos_analyzed": total_videos,
+                "videos_shown": max_videos,  # Actual count of videos in lists
+                "showing_all": total_videos <= 30,  # True if showing all available videos
                 "avg_views": analytics.get('avg_views_per_video', 0),
                 "avg_engagement": analytics.get('avg_engagement_rate', 0),
                 "top_performing_videos": [

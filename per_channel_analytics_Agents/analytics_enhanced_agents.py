@@ -41,10 +41,55 @@ class AnalyticsContext:
 📹 Total Videos: {channel['video_count']}
 """
             
-            # Get top performing videos (expanded to 30 for better AI context)
+            # Get top performing videos (up to 30, or all if fewer than 30)
+            # Priority: Latest + Top Performing
             recent_videos = latest_analytics.get('recent_videos', [])
-            top_performing = sorted(recent_videos, key=lambda x: x.get('views', 0), reverse=True)[:30]
-            high_engagement = sorted(recent_videos, key=lambda x: x.get('engagement_rate', 0), reverse=True)[:30]
+            total_videos = len(recent_videos)
+            max_videos = min(30, total_videos)
+            showing_all = total_videos <= 30
+            
+            # Calculate recency score (newer = higher score)
+            from datetime import datetime
+            if recent_videos:
+                # Parse dates and calculate days ago
+                for video in recent_videos:
+                    try:
+                        pub_date = datetime.fromisoformat(video['published_at'].replace('Z', '+00:00'))
+                        days_ago = (datetime.now(pub_date.tzinfo) - pub_date).days
+                        # Recency score: newer videos get higher scores (0-1 range)
+                        # Videos within 30 days = 1.0, after 365 days = 0
+                        video['recency_score'] = max(0, 1 - (days_ago / 365))
+                    except:
+                        video['recency_score'] = 0.5  # Default for parsing errors
+                
+                # Normalize views for scoring (0-1 range)
+                max_views = max(video.get('views', 0) for video in recent_videos) or 1
+                max_engagement = max(video.get('engagement_rate', 0) for video in recent_videos) or 1
+                
+                for video in recent_videos:
+                    video['views_score'] = video.get('views', 0) / max_views
+                    video['engagement_score'] = video.get('engagement_rate', 0) / max_engagement
+                    
+                    # Combined score: 40% recency + 40% views + 20% engagement
+                    video['combined_score'] = (
+                        0.4 * video['recency_score'] + 
+                        0.4 * video['views_score'] + 
+                        0.2 * video['engagement_score']
+                    )
+            
+            # Get top performers by combined score (recency + performance)
+            top_performing = sorted(
+                recent_videos, 
+                key=lambda x: x.get('combined_score', 0), 
+                reverse=True
+            )[:max_videos]
+            
+            # Get high engagement performers (also considering recency)
+            high_engagement = sorted(
+                recent_videos,
+                key=lambda x: (0.5 * x.get('engagement_score', 0) + 0.5 * x.get('recency_score', 0)),
+                reverse=True
+            )[:max_videos]
             
             context = f"""
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -56,13 +101,13 @@ class AnalyticsContext:
 📹 Total Videos: {channel['video_count']}
 👁️ Total Views: {channel.get('view_count', 0):,}
 
-📊 RECENT PERFORMANCE (Last 50 Videos):
+📊 RECENT PERFORMANCE (Last {total_videos} Videos):
 ├─ Average Views: {latest_analytics['avg_views_per_video']:,.0f}
 ├─ Average Engagement: {latest_analytics['avg_engagement_rate']:.2%}
 ├─ Total Recent Views: {latest_analytics['total_recent_views']:,}
 └─ Total Engagement: {latest_analytics['total_recent_likes'] + latest_analytics['total_recent_comments']:,}
 
-🔥 TOP 30 PERFORMING VIDEOS (By Views):
+🔥 {'ALL' if showing_all else f'TOP {max_videos} LATEST & BEST'} PERFORMING VIDEOS (Sorted by: Recency 40% + Views 40% + Engagement 20%){' - COMPLETE CHANNEL DATA' if showing_all else ''}:
 """
             for i, video in enumerate(top_performing, 1):
                 context += f"""
@@ -72,7 +117,7 @@ class AnalyticsContext:
             
             context += f"""
 
-💎 TOP 30 HIGH ENGAGEMENT VIDEOS:
+💎 {'ALL' if showing_all else f'TOP {max_videos} LATEST & MOST ENGAGING'} VIDEOS (Sorted by: Engagement 50% + Recency 50%){' - COMPLETE CHANNEL DATA' if showing_all else ''}:
 """
             for i, video in enumerate(high_engagement, 1):
                 context += f"""
