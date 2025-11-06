@@ -22,6 +22,8 @@ from agents import (
     set_tracing_disabled,
 )
 from youtube_tools import YOUTUBE_TOOLS
+from channel_analytics_tracker import ChannelAnalyticsTracker
+
 # Load environment variables
 load_dotenv()
 
@@ -437,6 +439,102 @@ async def get_agent_insights(agent_name: str):
 async def get_global_rl_insights():
     """Get global insights from central memory"""
     return await rl_registry.get_global_insights()
+
+
+# Channel Analytics & Video Ideas Endpoints
+analytics_tracker = ChannelAnalyticsTracker()
+
+
+class ChannelSubmitRequest(BaseModel):
+    channel_url: str
+    user_id: Optional[str] = "default"
+
+
+class VideoIdeaRequest(BaseModel):
+    channel_id: str
+    user_id: Optional[str] = "default"
+
+
+@app.post("/api/channel/track")
+async def track_channel(request: ChannelSubmitRequest):
+    """
+    Save YouTube channel for tracking and analytics
+    
+    Example:
+    {
+        "channel_url": "https://www.youtube.com/@MrBeast",
+        "user_id": "user123"
+    }
+    """
+    try:
+        result = await analytics_tracker.save_channel(
+            channel_url=request.channel_url,
+            user_id=request.user_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to track channel: {str(e)}")
+
+
+@app.post("/api/channel/video-ideas")
+async def generate_video_ideas(request: VideoIdeaRequest):
+    """
+    Generate AI-powered video ideas based on channel analytics
+    
+    Example:
+    {
+        "channel_id": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+        "user_id": "user123"
+    }
+    """
+    try:
+        result = await analytics_tracker.generate_video_idea(
+            channel_id=request.channel_id,
+            user_id=request.user_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate ideas: {str(e)}")
+
+
+@app.get("/api/channel/tracked")
+async def get_tracked_channels(user_id: str = "default"):
+    """Get all tracked channels for a user"""
+    try:
+        channels = await analytics_tracker.get_tracked_channels(user_id=user_id)
+        return {
+            "status": "success",
+            "count": len(channels),
+            "channels": channels
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch channels: {str(e)}")
+
+
+@app.post("/api/channel/refresh-analytics/{channel_id}")
+async def refresh_channel_analytics(channel_id: str, user_id: str = "default"):
+    """Manually refresh analytics for a channel"""
+    try:
+        analytics = await analytics_tracker.fetch_analytics(
+            channel_id=channel_id,
+            user_id=user_id
+        )
+        
+        # Remove MongoDB-specific fields for JSON response
+        analytics.pop('_id', None)
+        if 'timestamp' in analytics:
+            analytics['timestamp'] = analytics['timestamp'].isoformat()
+        
+        return {
+            "status": "success",
+            "analytics": analytics
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to refresh analytics: {str(e)}")
 
 
 if __name__ == "__main__":
