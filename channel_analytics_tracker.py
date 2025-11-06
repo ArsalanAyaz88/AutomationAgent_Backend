@@ -310,6 +310,7 @@ High Engagement Videos:
         set_default_openai_client(openai_client)
         
         agent = Agent(
+            name="video_idea_generator",
             model=os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash-exp"),
             instructions="""You are a YouTube content strategist expert. 
             Analyze the channel's performance data and generate 3 viral video ideas.

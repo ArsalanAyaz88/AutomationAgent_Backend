@@ -137,7 +137,7 @@ OUTPUT: Professional YouTube script with hook, introduction, main content, and c
             
             # Create and run agent
             model_name = create_agent_client_func("agent3")
-            agent = Agent(model=model_name, instructions=prompt)
+            agent = Agent(name="script_generator", model=model_name, instructions=prompt)
             runner = Runner(agent=agent)
             
             result = await runner.run(
@@ -213,7 +213,7 @@ Format as a numbered list.
             
             # Create and run agent
             model_name = create_agent_client_func("agent5")
-            agent = Agent(model=model_name, instructions=prompt)
+            agent = Agent(name="video_ideas_generator", model=model_name, instructions=prompt)
             runner = Runner(agent=agent)
             
             result = await runner.run(
@@ -294,7 +294,7 @@ OUTPUT: Numbered list of titles only.
             
             # Create and run agent
             model_name = create_agent_client_func("agent2")
-            agent = Agent(model=model_name, instructions=prompt)
+            agent = Agent(name="title_generator", model=model_name, instructions=prompt)
             runner = Runner(agent=agent)
             
             result = await runner.run(
@@ -371,7 +371,7 @@ Format as a structured roadmap.
             
             # Create and run agent
             model_name = create_agent_client_func("agent6")
-            agent = Agent(model=model_name, instructions=prompt)
+            agent = Agent(name="roadmap_generator", model=model_name, instructions=prompt)
             runner = Runner(agent=agent)
             
             result = await runner.run(

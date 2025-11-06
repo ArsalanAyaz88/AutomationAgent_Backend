@@ -146,6 +146,7 @@ Generate ONLY the script content. No meta-commentary or production notes.
             
             # Create agent
             agent = Agent(
+                name="enhanced_script_generator",
                 model=model_name,
                 instructions=final_instructions
             )
