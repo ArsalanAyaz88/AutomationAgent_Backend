@@ -49,7 +49,7 @@ async def videos_searchVideos(
     maxResults: Annotated[Optional[int], "Maximum number of results"] = None,
 ) -> str:
     client = _get_client()
-    data = await client.search_videos(query, maxResults)
+    data = await client.search_videos(query, max_results=maxResults)
     return _to_text(data)
 
 
@@ -78,7 +78,7 @@ async def channels_listVideos(
     maxResults: Annotated[Optional[int], "Maximum number of videos to return"] = None,
 ) -> str:
     client = _get_client()
-    data = await client.list_channel_videos(channelId, maxResults)
+    data = await client.list_channel_videos(channelId, max_results=maxResults)
     return _to_text(data)
 
 
@@ -97,7 +97,7 @@ async def playlists_getPlaylistItems(
     maxResults: Annotated[Optional[int], "Maximum number of items to return"] = None,
 ) -> str:
     client = _get_client()
-    data = await client.get_playlist_items(playlistId, maxResults)
+    data = await client.get_playlist_items(playlistId, max_results=maxResults)
     return _to_text(data)
 
 

@@ -197,7 +197,7 @@ class ChannelAnalyticsTracker:
         stats = channel_info['statistics']
         
         # Get recent videos (last 50)
-        videos_data = await self.youtube_client.list_channel_videos(channel_id, maxResults=50)
+        videos_data = await self.youtube_client.list_channel_videos(channel_id, max_results=50)
         
         videos = []
         total_views = 0
