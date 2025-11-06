@@ -1,0 +1,75 @@
+{
+  "test_summary": {
+    "total_agents_tested": 7,
+    "successful_agents": 0,
+    "agents_with_rl": 0,
+    "rl_system_tests": 0,
+    "test_timestamp": "2025-11-06T07:10:48.792281"
+  },
+  "agent_results": {
+    "Agent 1 - Channel Auditor": {
+      "agent": "Agent 1 - Channel Auditor",
+      "endpoint": "/api/agent1/audit-channel",
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]",
+      "success": false,
+      "timestamp": "2025-11-06T07:10:17.856891"
+    },
+    "Agent 2 - Title Auditor": {
+      "agent": "Agent 2 - Title Auditor",
+      "endpoint": "/api/agent2/audit-titles",
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]",
+      "success": false,
+      "timestamp": "2025-11-06T07:10:21.259796"
+    },
+    "Agent 3 - Script Generator": {
+      "agent": "Agent 3 - Script Generator",
+      "endpoint": "/api/agent3/generate-script",
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]",
+      "success": false,
+      "timestamp": "2025-11-06T07:10:24.954444"
+    },
+    "Agent 4 - Script to Scene": {
+      "agent": "Agent 4 - Script to Scene",
+      "endpoint": "/api/agent4/script-to-prompts",
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]",
+      "success": false,
+      "timestamp": "2025-11-06T07:10:28.545764"
+    },
+    "Agent 5 - Ideas Generator": {
+      "agent": "Agent 5 - Ideas Generator",
+      "endpoint": "/api/agent5/generate-ideas",
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]",
+      "success": false,
+      "timestamp": "2025-11-06T07:10:32.295431"
+    },
+    "Agent 6 - Roadmap Generator": {
+      "agent": "Agent 6 - Roadmap Generator",
+      "endpoint": "/api/agent6/generate-roadmap",
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]",
+      "success": false,
+      "timestamp": "2025-11-06T07:10:35.937654"
+    },
+    "Agent 7 - Videos Fetcher": {
+      "agent": "Agent 7 - Videos Fetcher",
+      "endpoint": "/api/fifty-videos/fetch-links",
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]",
+      "success": false,
+      "timestamp": "2025-11-06T07:10:39.699230"
+    }
+  },
+  "rl_system_results": {
+    "status": {
+      "success": false,
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]"
+    },
+    "global_insights": {
+      "success": false,
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]"
+    },
+    "sync": {
+      "success": false,
+      "error": "Cannot connect to host localhost:8000 ssl:default [The remote computer refused the network connection]"
+    }
+  },
+  "overall_success": false
+}

@@ -1,12 +1,18 @@
 """
-Agent 1: Channel Deep Auditor - "The Gold Digger"
-Finds promising YouTube channels through deep performance analysis.
+Agent 1: Channel Deep Auditor - "The Gold Digger" with RL Learning
+Finds promising YouTube channels through deep performance analysis and learns from feedback.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
+
+# Import RL integration
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from rl_integration import rl_enhanced
 
 
 # Request Models
@@ -19,12 +25,14 @@ class AgentResponse(BaseModel):
     success: bool
     result: str
     error: Optional[str] = None
+    rl_learning: Optional[Dict[str, Any]] = None
 
 
 def register_agent1_routes(app, create_agent_client_func, youtube_tools):
     """Register Agent 1 routes with the FastAPI app"""
     
     @app.post("/api/agent1/audit-channel", response_model=AgentResponse)
+    @rl_enhanced("agent1_channel_auditor")
     async def audit_channel(request: ChannelAuditRequest):
         """
         Agent 1: Channel Auditor

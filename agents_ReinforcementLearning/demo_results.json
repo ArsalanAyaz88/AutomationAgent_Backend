@@ -1,0 +1,930 @@
+{
+  "initialization": {
+    "fifty_videos_fetcher": {
+      "status": "initialized",
+      "type": "content_collector",
+      "capabilities": [
+        "video_fetching",
+        "link_extraction",
+        "channel_analysis"
+      ],
+      "integrator": "<memory_integration.AgentMemoryIntegrator object at 0x0000022FD023ACF0>",
+      "rl_engine": "<rl_engine.RLEngine object at 0x0000022FD02F4A50>",
+      "timestamp": "2025-11-06T06:50:44.088880"
+    },
+    "trend_analyzer": {
+      "status": "initialized",
+      "type": "trend_detector",
+      "capabilities": [
+        "trend_analysis",
+        "viral_prediction",
+        "content_timing"
+      ],
+      "integrator": "<memory_integration.AgentMemoryIntegrator object at 0x0000022FD02F6710>",
+      "rl_engine": "<rl_engine.RLEngine object at 0x0000022FD0326C40>",
+      "timestamp": "2025-11-06T06:50:58.425593"
+    },
+    "engagement_optimizer": {
+      "status": "initialized",
+      "type": "engagement_specialist",
+      "capabilities": [
+        "title_optimization",
+        "thumbnail_analysis",
+        "ctr_improvement"
+      ],
+      "integrator": "<memory_integration.AgentMemoryIntegrator object at 0x0000022FD02F79D0>",
+      "rl_engine": "<rl_engine.RLEngine object at 0x0000022FD0332450>",
+      "timestamp": "2025-11-06T06:51:12.802604"
+    },
+    "audience_analyzer": {
+      "status": "initialized",
+      "type": "audience_specialist",
+      "capabilities": [
+        "demographic_analysis",
+        "behavior_tracking",
+        "retention_optimization"
+      ],
+      "integrator": "<memory_integration.AgentMemoryIntegrator object at 0x0000022FD1A40B00>",
+      "rl_engine": "<rl_engine.RLEngine object at 0x0000022FD1A347C0>",
+      "timestamp": "2025-11-06T06:51:27.212272"
+    },
+    "content_strategist": {
+      "status": "initialized",
+      "type": "strategy_planner",
+      "capabilities": [
+        "content_planning",
+        "series_development",
+        "topic_research"
+      ],
+      "integrator": "<memory_integration.AgentMemoryIntegrator object at 0x0000022FD1A42520>",
+      "rl_engine": "<rl_engine.RLEngine object at 0x0000022FD033EA50>",
+      "timestamp": "2025-11-06T06:51:42.288602"
+    },
+    "performance_tracker": {
+      "status": "initialized",
+      "type": "analytics_specialist",
+      "capabilities": [
+        "metrics_tracking",
+        "performance_analysis",
+        "roi_calculation"
+      ],
+      "integrator": "<memory_integration.AgentMemoryIntegrator object at 0x0000022FD1A72D50>",
+      "rl_engine": "<rl_engine.RLEngine object at 0x0000022FD1ADF5C0>",
+      "timestamp": "2025-11-06T06:51:57.419057"
+    },
+    "monetization_optimizer": {
+      "status": "initialized",
+      "type": "revenue_specialist",
+      "capabilities": [
+        "ad_optimization",
+        "sponsorship_analysis",
+        "revenue_maximization"
+      ],
+      "integrator": "<memory_integration.AgentMemoryIntegrator object at 0x0000022FD1A35150>",
+      "rl_engine": "<rl_engine.RLEngine object at 0x0000022FD1E96190>",
+      "timestamp": "2025-11-06T06:52:11.850625"
+    }
+  },
+  "agent_actions": {
+    "fifty_videos_fetcher": {
+      "agent_id": "fifty_videos_fetcher",
+      "action": {
+        "type": "upload_time_optimization",
+        "parameters": {
+          "suggested_hour": 12,
+          "reason": "peak_engagement_time"
+        },
+        "confidence": 0.0
+      },
+      "state_summary": {
+        "video_views": 10000,
+        "channel_subscribers": 50000,
+        "engagement_rate": 0.055
+      },
+      "results": {
+        "views": 10234.060836371413,
+        "likes": 505.497571363389,
+        "comments": 49.566295234002276,
+        "shares": 23.84566130333629,
+        "watch_time_seconds": 120507.19172260912,
+        "ctr": 0.0519226561128657,
+        "engagement_rate": 0.0497344821650571,
+        "reward": -0.014700676956982614,
+        "simulation": true,
+        "action_confidence": 0.0
+      },
+      "q_value": 0.014190379201551764,
+      "experience_id": "1762393931857_6925",
+      "timestamp": "2025-11-06T06:52:13.557942"
+    },
+    "trend_analyzer": {
+      "agent_id": "trend_analyzer",
+      "action": {
+        "type": "upload_time_optimization",
+        "parameters": {
+          "suggested_hour": 20,
+          "reason": "peak_engagement_time"
+        },
+        "confidence": 0.0
+      },
+      "state_summary": {
+        "video_views": 10000,
+        "channel_subscribers": 50000,
+        "engagement_rate": 0.055
+      },
+      "results": {
+        "views": 9454.921482241647,
+        "likes": 501.64427251848167,
+        "comments": 51.02231630694024,
+        "shares": 24.965441672558693,
+        "watch_time_seconds": 119743.92378828027,
+        "ctr": 0.051296537187113835,
+        "engagement_rate": 0.06863576027634845,
+        "reward": 0.04791287514579716,
+        "simulation": true,
+        "action_confidence": 0.0
+      },
+      "q_value": 0.016559986010320223,
+      "experience_id": "1762393934567_9424",
+      "timestamp": "2025-11-06T06:52:16.203375"
+    },
+    "engagement_optimizer": {
+      "agent_id": "engagement_optimizer",
+      "action": {
+        "type": "upload_time_optimization",
+        "parameters": {
+          "suggested_hour": 8,
+          "reason": "peak_engagement_time"
+        },
+        "confidence": 0.0
+      },
+      "state_summary": {
+        "video_views": 10000,
+        "channel_subscribers": 50000,
+        "engagement_rate": 0.055
+      },
+      "results": {
+        "views": 11221.301672662954,
+        "likes": 475.30319079182055,
+        "comments": 48.33189622842067,
+        "shares": 25.84615862673754,
+        "watch_time_seconds": 119948.81493688116,
+        "ctr": 0.048142765288631,
+        "engagement_rate": 0.06757116164556655,
+        "reward": 0.05284323148835034,
+        "simulation": true,
+        "action_confidence": 0.0
+      },
+      "q_value": 0.02734458723335456,
+      "experience_id": "1762393937210_6964",
+      "timestamp": "2025-11-06T06:52:18.722349"
+    }
+  },
+  "collective_intelligence": {
+    "cycle_info": {
+      "duration_seconds": 39.39285755157471,
+      "timestamp": "2025-11-06T06:52:59.121285",
+      "success": true,
+      "participating_agents": 7
+    },
+    "individual_results": {
+      "fifty_videos_fetcher": {
+        "stm_processing": {
+          "total_stm_experiences": 1,
+          "high_value_experiences": [],
+          "agent_stats": {
+            "total_experiences": 1,
+            "avg_q_value": 0.014190379201551764,
+            "avg_reward": -0.014700676956982614,
+            "last_action_time": "2025-11-06T06:52:11.857723",
+            "high_q_count": 0
+          },
+          "promotion_candidates": 0
+        },
+        "ltm_promotion": {
+          "promoted_count": 0,
+          "errors": [],
+          "success_rate": 1.0
+        },
+        "central_sync": {
+          "insights": [],
+          "strategies": [],
+          "sync_timestamp": "2025-11-06T06:52:23.024045",
+          "total_insights_available": 0
+        },
+        "insight_application": {
+          "total_insights_received": 0,
+          "applied_insights": [],
+          "application_rate": 0.0
+        },
+        "strategy_update": {
+          "available_strategies": 0,
+          "adopted_strategies": [],
+          "adoption_rate": 0.0
+        },
+        "cycle_performance": {
+          "duration_seconds": 3.4533963203430176,
+          "success": true,
+          "timestamp": "2025-11-06T06:52:23.181935"
+        }
+      },
+      "trend_analyzer": {
+        "stm_processing": {
+          "total_stm_experiences": 1,
+          "high_value_experiences": [],
+          "agent_stats": {
+            "total_experiences": 1,
+            "avg_q_value": 0.016559986010320223,
+            "avg_reward": 0.04791287514579716,
+            "last_action_time": "2025-11-06T06:52:14.567143",
+            "high_q_count": 0
+          },
+          "promotion_candidates": 0
+        },
+        "ltm_promotion": {
+          "promoted_count": 0,
+          "errors": [],
+          "success_rate": 1.0
+        },
+        "central_sync": {
+          "insights": [],
+          "strategies": [],
+          "sync_timestamp": "2025-11-06T06:52:26.622463",
+          "total_insights_available": 0
+        },
+        "insight_application": {
+          "total_insights_received": 0,
+          "applied_insights": [],
+          "application_rate": 0.0
+        },
+        "strategy_update": {
+          "available_strategies": 0,
+          "adopted_strategies": [],
+          "adoption_rate": 0.0
+        },
+        "cycle_performance": {
+          "duration_seconds": 3.6191864013671875,
+          "success": true,
+          "timestamp": "2025-11-06T06:52:26.801499"
+        }
+      },
+      "engagement_optimizer": {
+        "stm_processing": {
+          "total_stm_experiences": 1,
+          "high_value_experiences": [],
+          "agent_stats": {
+            "total_experiences": 1,
+            "avg_q_value": 0.02734458723335456,
+            "avg_reward": 0.05284323148835034,
+            "last_action_time": "2025-11-06T06:52:17.210996",
+            "high_q_count": 0
+          },
+          "promotion_candidates": 0
+        },
+        "ltm_promotion": {
+          "promoted_count": 0,
+          "errors": [],
+          "success_rate": 1.0
+        },
+        "central_sync": {
+          "insights": [],
+          "strategies": [],
+          "sync_timestamp": "2025-11-06T06:52:30.094523",
+          "total_insights_available": 0
+        },
+        "insight_application": {
+          "total_insights_received": 0,
+          "applied_insights": [],
+          "application_rate": 0.0
+        },
+        "strategy_update": {
+          "available_strategies": 0,
+          "adopted_strategies": [],
+          "adoption_rate": 0.0
+        },
+        "cycle_performance": {
+          "duration_seconds": 3.4411120414733887,
+          "success": true,
+          "timestamp": "2025-11-06T06:52:30.253296"
+        }
+      },
+      "audience_analyzer": {
+        "stm_processing": {
+          "total_stm_experiences": 0,
+          "high_value_experiences": [],
+          "agent_stats": {
+            "total_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "last_action_time": null
+          },
+          "promotion_candidates": 0
+        },
+        "ltm_promotion": {
+          "promoted_count": 0,
+          "errors": [],
+          "success_rate": 1.0
+        },
+        "central_sync": {
+          "insights": [],
+          "strategies": [],
+          "sync_timestamp": "2025-11-06T06:52:33.960099",
+          "total_insights_available": 0
+        },
+        "insight_application": {
+          "total_insights_received": 0,
+          "applied_insights": [],
+          "application_rate": 0.0
+        },
+        "strategy_update": {
+          "available_strategies": 0,
+          "adopted_strategies": [],
+          "adoption_rate": 0.0
+        },
+        "cycle_performance": {
+          "duration_seconds": 3.8685972690582275,
+          "success": true,
+          "timestamp": "2025-11-06T06:52:34.122306"
+        }
+      },
+      "content_strategist": {
+        "stm_processing": {
+          "total_stm_experiences": 0,
+          "high_value_experiences": [],
+          "agent_stats": {
+            "total_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "last_action_time": null
+          },
+          "promotion_candidates": 0
+        },
+        "ltm_promotion": {
+          "promoted_count": 0,
+          "errors": [],
+          "success_rate": 1.0
+        },
+        "central_sync": {
+          "insights": [],
+          "strategies": [],
+          "sync_timestamp": "2025-11-06T06:52:37.654542",
+          "total_insights_available": 0
+        },
+        "insight_application": {
+          "total_insights_received": 0,
+          "applied_insights": [],
+          "application_rate": 0.0
+        },
+        "strategy_update": {
+          "available_strategies": 0,
+          "adopted_strategies": [],
+          "adoption_rate": 0.0
+        },
+        "cycle_performance": {
+          "duration_seconds": 3.704401731491089,
+          "success": true,
+          "timestamp": "2025-11-06T06:52:37.827084"
+        }
+      },
+      "performance_tracker": {
+        "stm_processing": {
+          "total_stm_experiences": 0,
+          "high_value_experiences": [],
+          "agent_stats": {
+            "total_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "last_action_time": null
+          },
+          "promotion_candidates": 0
+        },
+        "ltm_promotion": {
+          "promoted_count": 0,
+          "errors": [],
+          "success_rate": 1.0
+        },
+        "central_sync": {
+          "insights": [],
+          "strategies": [],
+          "sync_timestamp": "2025-11-06T06:52:41.557887",
+          "total_insights_available": 0
+        },
+        "insight_application": {
+          "total_insights_received": 0,
+          "applied_insights": [],
+          "application_rate": 0.0
+        },
+        "strategy_update": {
+          "available_strategies": 0,
+          "adopted_strategies": [],
+          "adoption_rate": 0.0
+        },
+        "cycle_performance": {
+          "duration_seconds": 3.876629590988159,
+          "success": true,
+          "timestamp": "2025-11-06T06:52:41.716053"
+        }
+      },
+      "monetization_optimizer": {
+        "stm_processing": {
+          "total_stm_experiences": 0,
+          "high_value_experiences": [],
+          "agent_stats": {
+            "total_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "last_action_time": null
+          },
+          "promotion_candidates": 0
+        },
+        "ltm_promotion": {
+          "promoted_count": 0,
+          "errors": [],
+          "success_rate": 1.0
+        },
+        "central_sync": {
+          "insights": [],
+          "strategies": [],
+          "sync_timestamp": "2025-11-06T06:52:45.376338",
+          "total_insights_available": 0
+        },
+        "insight_application": {
+          "total_insights_received": 0,
+          "applied_insights": [],
+          "application_rate": 0.0
+        },
+        "strategy_update": {
+          "available_strategies": 0,
+          "adopted_strategies": [],
+          "adoption_rate": 0.0
+        },
+        "cycle_performance": {
+          "duration_seconds": 3.8144633769989014,
+          "success": true,
+          "timestamp": "2025-11-06T06:52:45.535182"
+        }
+      }
+    },
+    "cross_agent_patterns": [],
+    "performance_leaderboard": {
+      "leaderboard": [
+        {
+          "agent_id": "fifty_videos_fetcher",
+          "agent_type": "content_collector",
+          "overall_score": 0.0,
+          "total_experiences": 0,
+          "avg_q_value": 0.0,
+          "avg_reward": 0.0,
+          "high_value_experiences": 0,
+          "last_updated": "2025-11-06 06:52:46.163653",
+          "rank": 1
+        },
+        {
+          "agent_id": "trend_analyzer",
+          "agent_type": "trend_detector",
+          "overall_score": 0.0,
+          "total_experiences": 0,
+          "avg_q_value": 0.0,
+          "avg_reward": 0.0,
+          "high_value_experiences": 0,
+          "last_updated": "2025-11-06 06:52:46.323458",
+          "rank": 2
+        },
+        {
+          "agent_id": "engagement_optimizer",
+          "agent_type": "engagement_specialist",
+          "overall_score": 0.0,
+          "total_experiences": 0,
+          "avg_q_value": 0.0,
+          "avg_reward": 0.0,
+          "high_value_experiences": 0,
+          "last_updated": "2025-11-06 06:52:46.480405",
+          "rank": 3
+        },
+        {
+          "agent_id": "audience_analyzer",
+          "agent_type": "audience_specialist",
+          "overall_score": 0.0,
+          "total_experiences": 0,
+          "avg_q_value": 0.0,
+          "avg_reward": 0.0,
+          "high_value_experiences": 0,
+          "last_updated": "2025-11-06 06:52:46.637573",
+          "rank": 4
+        },
+        {
+          "agent_id": "content_strategist",
+          "agent_type": "strategy_planner",
+          "overall_score": 0.0,
+          "total_experiences": 0,
+          "avg_q_value": 0.0,
+          "avg_reward": 0.0,
+          "high_value_experiences": 0,
+          "last_updated": "2025-11-06 06:52:46.798191",
+          "rank": 5
+        },
+        {
+          "agent_id": "performance_tracker",
+          "agent_type": "analytics_specialist",
+          "overall_score": 0.0,
+          "total_experiences": 0,
+          "avg_q_value": 0.0,
+          "avg_reward": 0.0,
+          "high_value_experiences": 0,
+          "last_updated": "2025-11-06 06:52:46.955283",
+          "rank": 6
+        },
+        {
+          "agent_id": "monetization_optimizer",
+          "agent_type": "revenue_specialist",
+          "overall_score": 0.0,
+          "total_experiences": 0,
+          "avg_q_value": 0.0,
+          "avg_reward": 0.0,
+          "high_value_experiences": 0,
+          "last_updated": "2025-11-06 06:52:47.112273",
+          "rank": 7
+        }
+      ],
+      "last_updated": "2025-11-06T06:52:48.245293",
+      "total_agents": 7
+    },
+    "urgent_insights": [],
+    "collective_report": {
+      "collective_metrics": {
+        "total_agents": 7,
+        "total_experiences_collected": 0,
+        "total_high_value_experiences": 0,
+        "collective_performance_score": 0.0,
+        "knowledge_quality_ratio": 0.0
+      },
+      "global_statistics": {
+        "system_overview": {
+          "total_active_agents": 8,
+          "total_global_insights": 0,
+          "collective_strategies": 0,
+          "cross_agent_patterns": 0,
+          "recent_syncs_24h": 7,
+          "average_agent_performance": 0.0
+        },
+        "top_insights": [],
+        "last_updated": "2025-11-06T06:52:49.536571"
+      },
+      "system_health": {
+        "all_agents_active": true,
+        "integration_success_rate": 0.0,
+        "last_updated": "2025-11-06T06:52:59.121274"
+      }
+    },
+    "orchestrator_stats": {
+      "total_cycles": 1,
+      "successful_cycles": 1,
+      "cross_agent_patterns_detected": 0,
+      "urgent_insights_broadcasted": 0
+    }
+  },
+  "system_status": {
+    "system_info": {
+      "total_agents": 7,
+      "active_agents": 7,
+      "system_uptime": "2025-11-06T06:53:09.617712",
+      "configuration": {
+        "stm_to_ltm_threshold": 0.7,
+        "sync_interval_minutes": 30
+      }
+    },
+    "global_statistics": {
+      "system_overview": {
+        "total_active_agents": 8,
+        "total_global_insights": 0,
+        "collective_strategies": 0,
+        "cross_agent_patterns": 0,
+        "recent_syncs_24h": 7,
+        "average_agent_performance": 0.0
+      },
+      "top_insights": [],
+      "last_updated": "2025-11-06T06:53:00.258882"
+    },
+    "agent_statuses": {
+      "fifty_videos_fetcher": {
+        "agent_id": "fifty_videos_fetcher",
+        "agent_type": "content_collector",
+        "capabilities": [
+          "video_fetching",
+          "link_extraction",
+          "channel_analysis"
+        ],
+        "last_sync_time": "2025-11-06T06:52:23.181932",
+        "integration_stats": {
+          "total_integrations": 1,
+          "stm_to_ltm_promotions": 0,
+          "central_syncs": 1,
+          "insights_received": 0,
+          "strategies_updated": 0
+        },
+        "config": {
+          "stm_to_ltm_threshold": 0.7,
+          "sync_interval_minutes": 30,
+          "max_stm_experiences": 1000,
+          "ltm_cleanup_days": 30,
+          "insight_confidence_threshold": 0.6,
+          "urgent_reward_threshold": 0.9,
+          "poor_performance_threshold": -0.5
+        },
+        "memory_status": {
+          "stm_stats": {
+            "total_experiences": 1,
+            "avg_q_value": 0.014190379201551764,
+            "avg_reward": -0.014700676956982614,
+            "last_action_time": "2025-11-06T06:52:11.857723",
+            "high_q_count": 0
+          },
+          "ltm_stats": {
+            "total_experiences": 0,
+            "high_value_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "max_q_value": 0.0,
+            "min_q_value": 0.0,
+            "learned_patterns": 0,
+            "active_strategies": 0
+          }
+        }
+      },
+      "trend_analyzer": {
+        "agent_id": "trend_analyzer",
+        "agent_type": "trend_detector",
+        "capabilities": [
+          "trend_analysis",
+          "viral_prediction",
+          "content_timing"
+        ],
+        "last_sync_time": "2025-11-06T06:52:26.801496",
+        "integration_stats": {
+          "total_integrations": 1,
+          "stm_to_ltm_promotions": 0,
+          "central_syncs": 1,
+          "insights_received": 0,
+          "strategies_updated": 0
+        },
+        "config": {
+          "stm_to_ltm_threshold": 0.7,
+          "sync_interval_minutes": 30,
+          "max_stm_experiences": 1000,
+          "ltm_cleanup_days": 30,
+          "insight_confidence_threshold": 0.6,
+          "urgent_reward_threshold": 0.9,
+          "poor_performance_threshold": -0.5
+        },
+        "memory_status": {
+          "stm_stats": {
+            "total_experiences": 1,
+            "avg_q_value": 0.016559986010320223,
+            "avg_reward": 0.04791287514579716,
+            "last_action_time": "2025-11-06T06:52:14.567143",
+            "high_q_count": 0
+          },
+          "ltm_stats": {
+            "total_experiences": 0,
+            "high_value_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "max_q_value": 0.0,
+            "min_q_value": 0.0,
+            "learned_patterns": 0,
+            "active_strategies": 0
+          }
+        }
+      },
+      "engagement_optimizer": {
+        "agent_id": "engagement_optimizer",
+        "agent_type": "engagement_specialist",
+        "capabilities": [
+          "title_optimization",
+          "thumbnail_analysis",
+          "ctr_improvement"
+        ],
+        "last_sync_time": "2025-11-06T06:52:30.253294",
+        "integration_stats": {
+          "total_integrations": 1,
+          "stm_to_ltm_promotions": 0,
+          "central_syncs": 1,
+          "insights_received": 0,
+          "strategies_updated": 0
+        },
+        "config": {
+          "stm_to_ltm_threshold": 0.7,
+          "sync_interval_minutes": 30,
+          "max_stm_experiences": 1000,
+          "ltm_cleanup_days": 30,
+          "insight_confidence_threshold": 0.6,
+          "urgent_reward_threshold": 0.9,
+          "poor_performance_threshold": -0.5
+        },
+        "memory_status": {
+          "stm_stats": {
+            "total_experiences": 1,
+            "avg_q_value": 0.02734458723335456,
+            "avg_reward": 0.05284323148835034,
+            "last_action_time": "2025-11-06T06:52:17.210996",
+            "high_q_count": 0
+          },
+          "ltm_stats": {
+            "total_experiences": 0,
+            "high_value_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "max_q_value": 0.0,
+            "min_q_value": 0.0,
+            "learned_patterns": 0,
+            "active_strategies": 0
+          }
+        }
+      },
+      "audience_analyzer": {
+        "agent_id": "audience_analyzer",
+        "agent_type": "audience_specialist",
+        "capabilities": [
+          "demographic_analysis",
+          "behavior_tracking",
+          "retention_optimization"
+        ],
+        "last_sync_time": "2025-11-06T06:52:34.122305",
+        "integration_stats": {
+          "total_integrations": 1,
+          "stm_to_ltm_promotions": 0,
+          "central_syncs": 1,
+          "insights_received": 0,
+          "strategies_updated": 0
+        },
+        "config": {
+          "stm_to_ltm_threshold": 0.7,
+          "sync_interval_minutes": 30,
+          "max_stm_experiences": 1000,
+          "ltm_cleanup_days": 30,
+          "insight_confidence_threshold": 0.6,
+          "urgent_reward_threshold": 0.9,
+          "poor_performance_threshold": -0.5
+        },
+        "memory_status": {
+          "stm_stats": {
+            "total_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "last_action_time": null
+          },
+          "ltm_stats": {
+            "total_experiences": 0,
+            "high_value_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "max_q_value": 0.0,
+            "min_q_value": 0.0,
+            "learned_patterns": 0,
+            "active_strategies": 0
+          }
+        }
+      },
+      "content_strategist": {
+        "agent_id": "content_strategist",
+        "agent_type": "strategy_planner",
+        "capabilities": [
+          "content_planning",
+          "series_development",
+          "topic_research"
+        ],
+        "last_sync_time": "2025-11-06T06:52:37.827083",
+        "integration_stats": {
+          "total_integrations": 1,
+          "stm_to_ltm_promotions": 0,
+          "central_syncs": 1,
+          "insights_received": 0,
+          "strategies_updated": 0
+        },
+        "config": {
+          "stm_to_ltm_threshold": 0.7,
+          "sync_interval_minutes": 30,
+          "max_stm_experiences": 1000,
+          "ltm_cleanup_days": 30,
+          "insight_confidence_threshold": 0.6,
+          "urgent_reward_threshold": 0.9,
+          "poor_performance_threshold": -0.5
+        },
+        "memory_status": {
+          "stm_stats": {
+            "total_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "last_action_time": null
+          },
+          "ltm_stats": {
+            "total_experiences": 0,
+            "high_value_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "max_q_value": 0.0,
+            "min_q_value": 0.0,
+            "learned_patterns": 0,
+            "active_strategies": 0
+          }
+        }
+      },
+      "performance_tracker": {
+        "agent_id": "performance_tracker",
+        "agent_type": "analytics_specialist",
+        "capabilities": [
+          "metrics_tracking",
+          "performance_analysis",
+          "roi_calculation"
+        ],
+        "last_sync_time": "2025-11-06T06:52:41.716051",
+        "integration_stats": {
+          "total_integrations": 1,
+          "stm_to_ltm_promotions": 0,
+          "central_syncs": 1,
+          "insights_received": 0,
+          "strategies_updated": 0
+        },
+        "config": {
+          "stm_to_ltm_threshold": 0.7,
+          "sync_interval_minutes": 30,
+          "max_stm_experiences": 1000,
+          "ltm_cleanup_days": 30,
+          "insight_confidence_threshold": 0.6,
+          "urgent_reward_threshold": 0.9,
+          "poor_performance_threshold": -0.5
+        },
+        "memory_status": {
+          "stm_stats": {
+            "total_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "last_action_time": null
+          },
+          "ltm_stats": {
+            "total_experiences": 0,
+            "high_value_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "max_q_value": 0.0,
+            "min_q_value": 0.0,
+            "learned_patterns": 0,
+            "active_strategies": 0
+          }
+        }
+      },
+      "monetization_optimizer": {
+        "agent_id": "monetization_optimizer",
+        "agent_type": "revenue_specialist",
+        "capabilities": [
+          "ad_optimization",
+          "sponsorship_analysis",
+          "revenue_maximization"
+        ],
+        "last_sync_time": "2025-11-06T06:52:45.535180",
+        "integration_stats": {
+          "total_integrations": 1,
+          "stm_to_ltm_promotions": 0,
+          "central_syncs": 1,
+          "insights_received": 0,
+          "strategies_updated": 0
+        },
+        "config": {
+          "stm_to_ltm_threshold": 0.7,
+          "sync_interval_minutes": 30,
+          "max_stm_experiences": 1000,
+          "ltm_cleanup_days": 30,
+          "insight_confidence_threshold": 0.6,
+          "urgent_reward_threshold": 0.9,
+          "poor_performance_threshold": -0.5
+        },
+        "memory_status": {
+          "stm_stats": {
+            "total_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "last_action_time": null
+          },
+          "ltm_stats": {
+            "total_experiences": 0,
+            "high_value_experiences": 0,
+            "avg_q_value": 0.0,
+            "avg_reward": 0.0,
+            "max_q_value": 0.0,
+            "min_q_value": 0.0,
+            "learned_patterns": 0,
+            "active_strategies": 0
+          }
+        }
+      }
+    },
+    "orchestrator_stats": {
+      "total_cycles": 1,
+      "successful_cycles": 1,
+      "cross_agent_patterns_detected": 0,
+      "urgent_insights_broadcasted": 0
+    },
+    "last_updated": "2025-11-06T06:53:09.617721"
+  },
+  "demo_completed": "2025-11-06T06:53:09.617724"
+}

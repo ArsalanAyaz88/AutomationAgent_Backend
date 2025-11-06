@@ -3,11 +3,17 @@ Agent 4: Script-to-Scene Synchronizer - "The Director"
 Uses Planner-Critic multi-agent pattern for intelligent task decomposition.
 """
 
-from typing import Optional
+from typing import Optional, Dict, Any
 import re
 from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
+
+# Import RL integration
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from rl_integration import rl_enhanced
 
 
 # Request Models
@@ -20,6 +26,7 @@ class AgentResponse(BaseModel):
     success: bool
     result: str
     error: Optional[str] = None
+    rl_learning: Optional[Dict[str, Any]] = None
 
 
 def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
@@ -53,6 +60,7 @@ def register_agent4_routes(app, create_agent_client_func, youtube_tools=None):
         return out
     
     @app.post("/api/agent4/script-to-prompts", response_model=AgentResponse)
+    @rl_enhanced("agent4_script_to_scene")
     async def script_to_prompts(request: ScriptToPromptsRequest):
         """
         Agent 4: Script-to-Scene Synchronizer - "The Director"

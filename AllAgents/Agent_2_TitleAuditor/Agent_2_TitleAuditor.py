@@ -1,30 +1,35 @@
 """
-Agent 2: Video-Level Auditor - "The Content Detective"
-Deconstructs high-performing videos to identify success patterns.
+Agent 2: Video-Level Auditor - "The Content Detective" with RL Learning
+Deconstructs high-performing videos to identify success patterns and learns from feedback.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
 
+# Import RL integration
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from rl_integration import rl_enhanced
 
 # Request Models
 class TitleAuditRequest(BaseModel):
     video_urls: List[str]
     user_query: str = "Analyze these videos and extract winning patterns"
 
-
 class AgentResponse(BaseModel):
     success: bool
     result: str
     error: Optional[str] = None
-
+    rl_learning: Optional[Dict[str, Any]] = None
 
 def register_agent2_routes(app, create_agent_client_func, youtube_tools):
     """Register Agent 2 routes with the FastAPI app"""
     
     @app.post("/api/agent2/audit-titles", response_model=AgentResponse)
+    @rl_enhanced("agent2_title_auditor")
     async def audit_titles(request: TitleAuditRequest):
         """
         Agent 2: Video-Level Auditor - "The Content Detective"

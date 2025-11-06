@@ -1,6 +1,6 @@
 """
-Agent: 50 Videos Fetcher - "The Link Collector"
-Fetches the latest 50 video links from a YouTube channel.
+Agent: 50 Videos Fetcher - "The Link Collector" with RL Learning
+Fetches the latest 50 video links from a YouTube channel and learns from performance.
 """
 
 from typing import Optional
@@ -8,6 +8,12 @@ from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
 import re
+
+# Import RL integration
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from rl_integration import rl_enhanced
 
 
 # Request Models
@@ -35,6 +41,7 @@ def register_fifty_videos_routes(app, create_agent_client_func, youtube_tools):
     """Register 50 Videos Fetcher routes with the FastAPI app"""
     
     @app.post("/api/fifty-videos/fetch-links", response_model=AgentResponse)
+    @rl_enhanced("fifty_videos_fetcher")  # Add RL learning capabilities
     async def fetch_fifty_videos(request: FiftyVideosRequest):
         """
         Agent: 50 Videos Fetcher - "The Link Collector"

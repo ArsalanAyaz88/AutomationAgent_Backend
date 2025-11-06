@@ -3,10 +3,16 @@ Agent 6: Video Roadmap Planner - "The Strategist"
 Creates 30-video content roadmaps for YouTube channel growth.
 """
 
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
+
+# Import RL integration
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from rl_integration import rl_enhanced
 
 
 # Request Models
@@ -21,12 +27,14 @@ class AgentResponse(BaseModel):
     success: bool
     result: str
     error: Optional[str] = None
+    rl_learning: Optional[Dict[str, Any]] = None
 
 
 def register_agent6_routes(app, create_agent_client_func, youtube_tools=None):
     """Register Agent 6 routes with the FastAPI app"""
     
     @app.post("/api/agent6/generate-roadmap", response_model=AgentResponse)
+    @rl_enhanced("agent6_roadmap_generator")
     async def generate_roadmap(request: RoadmapGenerationRequest):
         """
         Agent 6: Video Roadmap Planner - "The Strategist"

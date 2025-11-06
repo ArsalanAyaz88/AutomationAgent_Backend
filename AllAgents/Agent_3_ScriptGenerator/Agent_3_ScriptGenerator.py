@@ -9,10 +9,16 @@ Features:
 - Pure script content - no visuals, voiceover notes, or production cues
 """
 
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import HTTPException
 from agents import Agent, Runner
 from pydantic import BaseModel
+
+# Import RL integration
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from rl_integration import rl_enhanced
 
 
 # Request Models
@@ -33,12 +39,14 @@ class AgentResponse(BaseModel):
     success: bool
     result: str
     error: Optional[str] = None
+    rl_learning: Optional[Dict[str, Any]] = None
 
 
 def register_agent3_routes(app, create_agent_client_func, youtube_tools=None):
     """Register Agent 3 routes with the FastAPI app"""
     
     @app.post("/api/agent3/generate-script", response_model=AgentResponse)
+    @rl_enhanced("agent3_script_generator")
     async def generate_script(request: ScriptGenerationRequest):
         """
         Agent 3: Script Generator - "The Storyteller"

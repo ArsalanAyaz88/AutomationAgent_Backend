@@ -1,0 +1,40 @@
+2025-11-06 06:50:28,879 - YouTubeAgentSystem - INFO - Starting YouTube RL Agent System Demo...
+2025-11-06 06:50:28,880 - YouTubeAgentSystem - INFO - Initializing YouTube RL Agent System...
+2025-11-06 06:50:28,880 - YouTubeAgentSystem - INFO - Initializing agent: fifty_videos_fetcher
+2025-11-06 06:50:44,088 - CollectiveIntelligence - INFO - Registered agent fifty_videos_fetcher with capabilities: ['video_fetching', 'link_extraction', 'channel_analysis']
+2025-11-06 06:50:44,088 - YouTubeAgentSystem - INFO - Agent fifty_videos_fetcher initialized successfully
+2025-11-06 06:50:44,089 - YouTubeAgentSystem - INFO - Initializing agent: trend_analyzer
+2025-11-06 06:50:58,424 - CollectiveIntelligence - INFO - Registered agent trend_analyzer with capabilities: ['trend_analysis', 'viral_prediction', 'content_timing']
+2025-11-06 06:50:58,425 - YouTubeAgentSystem - INFO - Agent trend_analyzer initialized successfully
+2025-11-06 06:50:58,425 - YouTubeAgentSystem - INFO - Initializing agent: engagement_optimizer
+2025-11-06 06:51:12,798 - CollectiveIntelligence - INFO - Registered agent engagement_optimizer with capabilities: ['title_optimization', 'thumbnail_analysis', 'ctr_improvement']
+2025-11-06 06:51:12,802 - YouTubeAgentSystem - INFO - Agent engagement_optimizer initialized successfully
+2025-11-06 06:51:12,803 - YouTubeAgentSystem - INFO - Initializing agent: audience_analyzer
+2025-11-06 06:51:27,211 - CollectiveIntelligence - INFO - Registered agent audience_analyzer with capabilities: ['demographic_analysis', 'behavior_tracking', 'retention_optimization']
+2025-11-06 06:51:27,212 - YouTubeAgentSystem - INFO - Agent audience_analyzer initialized successfully
+2025-11-06 06:51:27,212 - YouTubeAgentSystem - INFO - Initializing agent: content_strategist
+2025-11-06 06:51:42,288 - CollectiveIntelligence - INFO - Registered agent content_strategist with capabilities: ['content_planning', 'series_development', 'topic_research']
+2025-11-06 06:51:42,288 - YouTubeAgentSystem - INFO - Agent content_strategist initialized successfully
+2025-11-06 06:51:42,288 - YouTubeAgentSystem - INFO - Initializing agent: performance_tracker
+2025-11-06 06:51:57,418 - CollectiveIntelligence - INFO - Registered agent performance_tracker with capabilities: ['metrics_tracking', 'performance_analysis', 'roi_calculation']
+2025-11-06 06:51:57,419 - YouTubeAgentSystem - INFO - Agent performance_tracker initialized successfully
+2025-11-06 06:51:57,419 - YouTubeAgentSystem - INFO - Initializing agent: monetization_optimizer
+2025-11-06 06:52:11,850 - CollectiveIntelligence - INFO - Registered agent monetization_optimizer with capabilities: ['ad_optimization', 'sponsorship_analysis', 'revenue_maximization']
+2025-11-06 06:52:11,850 - YouTubeAgentSystem - INFO - Agent monetization_optimizer initialized successfully
+2025-11-06 06:52:11,850 - YouTubeAgentSystem - INFO - System initialization complete: 7/7 agents initialized
+2025-11-06 06:52:19,728 - YouTubeAgentSystem - INFO - Running collective intelligence cycle...
+2025-11-06 06:52:19,728 - MemoryIntegrator-fifty_videos_fetcher - INFO - Starting integration cycle for agent fifty_videos_fetcher
+2025-11-06 06:52:23,181 - MemoryIntegrator-fifty_videos_fetcher - INFO - Integration cycle completed in 3.45s
+2025-11-06 06:52:23,182 - MemoryIntegrator-trend_analyzer - INFO - Starting integration cycle for agent trend_analyzer
+2025-11-06 06:52:26,801 - MemoryIntegrator-trend_analyzer - INFO - Integration cycle completed in 3.62s
+2025-11-06 06:52:26,812 - MemoryIntegrator-engagement_optimizer - INFO - Starting integration cycle for agent engagement_optimizer
+2025-11-06 06:52:30,253 - MemoryIntegrator-engagement_optimizer - INFO - Integration cycle completed in 3.44s
+2025-11-06 06:52:30,253 - MemoryIntegrator-audience_analyzer - INFO - Starting integration cycle for agent audience_analyzer
+2025-11-06 06:52:34,122 - MemoryIntegrator-audience_analyzer - INFO - Integration cycle completed in 3.87s
+2025-11-06 06:52:34,122 - MemoryIntegrator-content_strategist - INFO - Starting integration cycle for agent content_strategist
+2025-11-06 06:52:37,827 - MemoryIntegrator-content_strategist - INFO - Integration cycle completed in 3.70s
+2025-11-06 06:52:37,839 - MemoryIntegrator-performance_tracker - INFO - Starting integration cycle for agent performance_tracker
+2025-11-06 06:52:41,716 - MemoryIntegrator-performance_tracker - INFO - Integration cycle completed in 3.88s
+2025-11-06 06:52:41,720 - MemoryIntegrator-monetization_optimizer - INFO - Starting integration cycle for agent monetization_optimizer
+2025-11-06 06:52:45,535 - MemoryIntegrator-monetization_optimizer - INFO - Integration cycle completed in 3.81s
+2025-11-06 06:53:09,617 - YouTubeAgentSystem - INFO - Demo completed successfully!

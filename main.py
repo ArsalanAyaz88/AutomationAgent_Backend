@@ -166,6 +166,9 @@ def create_agent_client(agent_key: str):
     return config["model"]
 
 
+# Import RL integration system
+from rl_integration import rl_registry, get_rl_system_status
+
 # Import and register all agent routes
 from AllAgents.Agent_1_ChannelAuditor.Agent_1_ChannelAuditor import register_agent1_routes
 from AllAgents.Agent_2_TitleAuditor.Agent_2_TitleAuditor import register_agent2_routes
@@ -183,6 +186,10 @@ register_agent4_routes(app, create_agent_client, YOUTUBE_TOOLS)
 register_agent5_routes(app, create_agent_client, YOUTUBE_TOOLS)
 register_agent6_routes(app, create_agent_client, YOUTUBE_TOOLS)
 register_fifty_videos_routes(app, create_agent_client, YOUTUBE_TOOLS)
+
+# Register RL System API endpoints
+from api_rl_endpoints import router as rl_router
+app.include_router(rl_router)
 
 
 def _ensure_saved_responses_collection():
@@ -350,22 +357,42 @@ async def root():
         "message": "YouTube Automation AI Agents API",
         "version": "1.0.0",
         "agents": {
-            "agent1": "Channel Auditor - Deep channel audit to pick hot channels",
-            "agent2": "Title Auditor - Analyze titles, thumbnails, keywords, hooks",
-            "agent3": "Script Writer - Generate scripts from audit data",
-            "agent4": "Script to Prompts - Convert scripts to scene prompts",
-            "agent5": "Ideas Generator - Generate 3 winning titles & thumbnails",
-            "agent6": "Roadmap Generator - 30-video roadmap with titles & thumbnails",
-            "fifty_videos": "50 Videos Fetcher - Get latest 50 video links from a channel"
+            "agent1": "Channel Auditor - Deep channel audit to pick hot channels [RL Enhanced]",
+            "agent2": "Title Auditor - Analyze titles, thumbnails, keywords, hooks [RL Enhanced]", 
+            "agent3": "Script Writer - Generate scripts from audit data [RL Enhanced]",
+            "agent4": "Script to Prompts - Convert scripts to scene prompts [RL Enhanced]",
+            "agent5": "Ideas Generator - Generate 3 winning titles & thumbnails [RL Enhanced]",
+            "agent6": "Roadmap Generator - 30-video roadmap with titles & thumbnails [RL Enhanced]",
+            "fifty_videos": "50 Videos Fetcher - Get latest 50 video links from a channel [RL Enhanced]"
+        },
+        "rl_system": {
+            "status": "✅ ACTIVE - All agents enhanced with reinforcement learning",
+            "features": [
+                "Automatic learning from each interaction",
+                "Cross-agent knowledge sharing",
+                "Performance improvement over time", 
+                "Cloud-based memory hierarchy (STM/LTM/Central)"
+            ],
+            "memory_systems": {
+                "STM": "Redis Cloud - Fast temporary learning",
+                "LTM": "MongoDB Atlas - Persistent pattern storage", 
+                "Central": "MongoDB Atlas - Global collective intelligence"
+            }
         },
         "endpoints": {
-            "POST /api/agent1/audit-channel": "Channel auditing",
-            "POST /api/agent2/audit-titles": "Title & thumbnail analysis",
-            "POST /api/agent3/generate-script": "Script generation",
-            "POST /api/agent4/script-to-prompts": "Script to visual prompts",
-            "POST /api/agent5/generate-ideas": "Title & thumbnail ideas",
-            "POST /api/agent6/generate-roadmap": "Content roadmap generation",
-            "POST /api/fifty-videos/fetch-links": "Fetch 50 video links from channel"
+            "POST /api/agent1/audit-channel": "Channel auditing [RL Enhanced]",
+            "POST /api/agent2/audit-titles": "Title & thumbnail analysis [RL Enhanced]",
+            "POST /api/agent3/generate-script": "Script generation [RL Enhanced]",
+            "POST /api/agent4/script-to-prompts": "Script to visual prompts [RL Enhanced]",
+            "POST /api/agent5/generate-ideas": "Title & thumbnail ideas [RL Enhanced]",
+            "POST /api/agent6/generate-roadmap": "Content roadmap generation [RL Enhanced]",
+            "POST /api/fifty-videos/fetch-links": "Fetch 50 video links from channel [RL Enhanced]"
+        },
+        "rl_endpoints": {
+            "GET /api/rl/status": "Overall RL system status and learning progress",
+            "GET /api/rl/global-insights": "Collective intelligence insights",
+            "POST /api/rl/sync": "Manual agent synchronization trigger", 
+            "GET /api/rl/agents/{agent}/insights": "Individual agent learning progress"
         }
     }
 
@@ -373,6 +400,43 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "YouTube Automation Agents API"}
+
+
+# RL System Endpoints
+@app.get("/api/rl/status")
+async def get_rl_status():
+    """Get comprehensive RL system status and learning progress"""
+    return await get_rl_system_status()
+
+
+@app.post("/api/rl/sync")
+async def sync_rl_agents():
+    """Manually trigger RL agent synchronization with central memory"""
+    try:
+        sync_results = await rl_registry.sync_all_agents()
+        return {
+            "success": True,
+            "sync_results": sync_results,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"RL sync failed: {str(e)}")
+
+
+@app.get("/api/rl/agents/{agent_name}/insights")
+async def get_agent_insights(agent_name: str):
+    """Get learning insights for a specific agent"""
+    agent = rl_registry.get_agent(agent_name)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_name} not found")
+    
+    return await agent.get_learning_insights()
+
+
+@app.get("/api/rl/global-insights")
+async def get_global_rl_insights():
+    """Get global insights from central memory"""
+    return await rl_registry.get_global_insights()
 
 
 if __name__ == "__main__":
