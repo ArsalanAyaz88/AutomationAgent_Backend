@@ -145,7 +145,19 @@ OUTPUT: Professional YouTube script with hook, introduction, main content, and c
                 messages=[{"role": "user", "content": f"Generate script: {request.topic}"}]
             )
             
-            script = result.messages[-1].get('content', '') if result.messages else ""
+            print(f"[DEBUG] Script result: {result}")
+            print(f"[DEBUG] Messages count: {len(result.messages) if result.messages else 0}")
+            
+            if result.messages and len(result.messages) > 0:
+                script = result.messages[-1].get('content', '')
+                print(f"[DEBUG] Script content length: {len(script)}")
+            else:
+                print("[ERROR] No messages in result!")
+                script = ""
+            
+            # If still empty, provide error message
+            if not script or script.strip() == "":
+                script = "⚠️ Failed to generate script. Please try again or check backend logs."
             
             return UnifiedResponse(
                 success=True,
@@ -209,7 +221,19 @@ Format as a numbered list.
                 messages=[{"role": "user", "content": "Generate video ideas"}]
             )
             
-            ideas = result.messages[-1].get('content', '') if result.messages else ""
+            print(f"[DEBUG] Ideas result: {result}")
+            print(f"[DEBUG] Messages count: {len(result.messages) if result.messages else 0}")
+            
+            if result.messages and len(result.messages) > 0:
+                ideas = result.messages[-1].get('content', '')
+                print(f"[DEBUG] Ideas content length: {len(ideas)}")
+            else:
+                print("[ERROR] No messages in result!")
+                ideas = ""
+            
+            # If still empty, provide error message
+            if not ideas or ideas.strip() == "":
+                ideas = "⚠️ Failed to generate ideas. Please try again or check backend logs."
             
             return UnifiedResponse(
                 success=True,
@@ -275,10 +299,22 @@ OUTPUT: Numbered list of titles only.
             
             result = await runner.run(
                 context_variables={},
-                messages=[{"role": "user", "content": "Generate titles"}]
+                messages=[{"role": "user", "content": f"Generate titles for: {request.video_description}"}]
             )
             
-            titles = result.messages[-1].get('content', '') if result.messages else ""
+            print(f"[DEBUG] Titles result: {result}")
+            print(f"[DEBUG] Messages count: {len(result.messages) if result.messages else 0}")
+            
+            if result.messages and len(result.messages) > 0:
+                titles = result.messages[-1].get('content', '')
+                print(f"[DEBUG] Titles content length: {len(titles)}")
+            else:
+                print("[ERROR] No messages in result!")
+                titles = ""
+            
+            # If still empty, provide error message
+            if not titles or titles.strip() == "":
+                titles = "⚠️ Failed to generate titles. Please try again or check backend logs."
             
             return UnifiedResponse(
                 success=True,
@@ -343,7 +379,19 @@ Format as a structured roadmap.
                 messages=[{"role": "user", "content": "Generate content roadmap"}]
             )
             
-            roadmap = result.messages[-1].get('content', '') if result.messages else ""
+            print(f"[DEBUG] Roadmap result: {result}")
+            print(f"[DEBUG] Messages count: {len(result.messages) if result.messages else 0}")
+            
+            if result.messages and len(result.messages) > 0:
+                roadmap = result.messages[-1].get('content', '')
+                print(f"[DEBUG] Roadmap content length: {len(roadmap)}")
+            else:
+                print("[ERROR] No messages in result!")
+                roadmap = ""
+            
+            # If still empty, provide error message
+            if not roadmap or roadmap.strip() == "":
+                roadmap = "⚠️ Failed to generate roadmap. Please try again or check backend logs."
             
             return UnifiedResponse(
                 success=True,
