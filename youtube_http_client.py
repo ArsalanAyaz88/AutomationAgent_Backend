@@ -2,6 +2,10 @@ import os
 from typing import Any, Dict, List, Optional
 
 import httpx
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 
 class YouTubeHttpClient:

@@ -17,6 +17,7 @@ dnspython>=2.0.0
 fastapi>=0.100.0,<0.120.0
 uvicorn[standard]>=0.20.0,<0.30.0
 pydantic>=2.0.0,<3.0.0
+httpx>=0.24.0  # For YouTube API clients
 
 # YouTube API (essential)
 google-api-python-client>=2.80.0,<3.0.0

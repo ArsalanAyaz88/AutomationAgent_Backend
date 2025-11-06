@@ -3,7 +3,12 @@ from typing import Annotated, Optional, List
 
 from agents import function_tool
 
-from youtube_http_client import YouTubeHttpClient
+try:
+    # Try direct API client first (uses YOUTUBE_API_KEY)
+    from youtube_direct_client import YouTubeHttpClient
+except ImportError:
+    # Fallback to HTTP client (uses YOUTUBE_HTTP_BASE_URL)
+    from youtube_http_client import YouTubeHttpClient
 
 _client: YouTubeHttpClient | None = None
 

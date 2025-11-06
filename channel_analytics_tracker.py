@@ -11,7 +11,12 @@ from pymongo import MongoClient
 from bson import ObjectId
 import certifi
 
-from youtube_http_client import YouTubeHttpClient
+try:
+    # Try direct API client first (uses YOUTUBE_API_KEY)
+    from youtube_direct_client import YouTubeHttpClient
+except ImportError:
+    # Fallback to HTTP client (uses YOUTUBE_HTTP_BASE_URL)
+    from youtube_http_client import YouTubeHttpClient
 from agents import Agent, Runner, set_default_openai_client
 from openai import AsyncOpenAI
 
@@ -98,21 +103,29 @@ class ChannelAnalyticsTracker:
     
     async def save_channel(self, channel_url: str, user_id: str = "default") -> Dict[str, Any]:
         """Save channel for tracking (supports both channel URLs and video URLs)"""
+        print(f"[DEBUG] Processing URL: {channel_url}")
+        
         channel_id = self.extract_channel_id(channel_url)
+        print(f"[DEBUG] Extracted channel_id: {channel_id}")
+        
         if not channel_id:
             raise ValueError("Invalid YouTube channel or video URL")
         
         # Check if we need to get channel ID from video
         if channel_id.startswith("video:"):
             video_id = channel_id.replace("video:", "")
+            print(f"[DEBUG] Detected video URL, extracting video ID: {video_id}")
+            
             # Get video details to extract channel ID
             video_data = await self.youtube_client.get_video_stats(video_id)
             
             if not video_data or 'items' not in video_data or len(video_data['items']) == 0:
+                print(f"[ERROR] Video not found: {video_id}")
                 raise ValueError("Video not found or invalid video URL")
             
             # Extract channel ID from video data
             channel_id = video_data['items'][0]['snippet']['channelId']
+            print(f"[DEBUG] Extracted channel ID from video: {channel_id}")
         
         # Fetch channel data
         channel_data = await self.youtube_client.get_channel(channel_id)
