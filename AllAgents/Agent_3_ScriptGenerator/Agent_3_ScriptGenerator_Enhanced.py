@@ -152,18 +152,13 @@ Generate ONLY the script content. No meta-commentary or production notes.
             )
             
             # Run agent
-            runner = Runner()
-            result = await runner.run(
-                agent=agent,
-                context_variables={},
-                messages=[{
-                    "role": "user",
-                    "content": f"Generate a script about: {request.topic}"
-                }]
+            result = await Runner.run(
+                agent,
+                f"Generate a script about: {request.topic}"
             )
             
             # Extract result
-            final_response = result.messages[-1].get('content', '') if result.messages else "No response generated"
+            final_response = result.final_output if hasattr(result, 'final_output') else "No response generated"
             
             # Return with analytics info
             response = AgentResponse(

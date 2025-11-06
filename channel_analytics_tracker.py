@@ -325,19 +325,13 @@ High Engagement Videos:
             Be specific, actionable, and data-driven."""
         )
         
-        runner = Runner()
-        
-        result = await runner.run(
-            agent=agent,
-            context_variables={},
-            messages=[{
-                "role": "user",
-                "content": f"Based on this channel's analytics, suggest 3 high-performing video ideas:\n\n{context}"
-            }]
+        result = await Runner.run(
+            agent,
+            f"Based on this channel's analytics, suggest 3 high-performing video ideas:\n\n{context}"
         )
         
         # Parse AI response
-        ai_suggestions = result.messages[-1].get('content', '') if result.messages else "No suggestions generated"
+        ai_suggestions = result.final_output if hasattr(result, 'final_output') else "No suggestions generated"
         
         # Store the recommendation
         recommendation_record = {

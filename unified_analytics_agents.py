@@ -138,23 +138,16 @@ OUTPUT: Professional YouTube script with hook, introduction, main content, and c
             # Create and run agent
             model_name = create_agent_client_func("agent3")
             agent = Agent(name="script_generator", model=model_name, instructions=prompt)
-            runner = Runner()
             
-            result = await runner.run(
-                agent=agent,
-                context_variables={},
-                messages=[{"role": "user", "content": f"Generate script: {request.topic}"}]
+            result = await Runner.run(
+                agent,
+                f"Generate a {request.total_words}-word YouTube script about: {request.topic}"
             )
             
             print(f"[DEBUG] Script result: {result}")
-            print(f"[DEBUG] Messages count: {len(result.messages) if result.messages else 0}")
             
-            if result.messages and len(result.messages) > 0:
-                script = result.messages[-1].get('content', '')
-                print(f"[DEBUG] Script content length: {len(script)}")
-            else:
-                print("[ERROR] No messages in result!")
-                script = ""
+            script = result.final_output if hasattr(result, 'final_output') else ""
+            print(f"[DEBUG] Script content length: {len(script)}")
             
             # If still empty, provide error message
             if not script or script.strip() == "":
@@ -215,23 +208,16 @@ Format as a numbered list.
             # Create and run agent
             model_name = create_agent_client_func("agent5")
             agent = Agent(name="video_ideas_generator", model=model_name, instructions=prompt)
-            runner = Runner()
             
-            result = await runner.run(
-                agent=agent,
-                context_variables={},
-                messages=[{"role": "user", "content": "Generate video ideas"}]
+            result = await Runner.run(
+                agent,
+                f"Generate {request.video_count} {request.style} video ideas"
             )
             
             print(f"[DEBUG] Ideas result: {result}")
-            print(f"[DEBUG] Messages count: {len(result.messages) if result.messages else 0}")
             
-            if result.messages and len(result.messages) > 0:
-                ideas = result.messages[-1].get('content', '')
-                print(f"[DEBUG] Ideas content length: {len(ideas)}")
-            else:
-                print("[ERROR] No messages in result!")
-                ideas = ""
+            ideas = result.final_output if hasattr(result, 'final_output') else ""
+            print(f"[DEBUG] Ideas content length: {len(ideas)}")
             
             # If still empty, provide error message
             if not ideas or ideas.strip() == "":
@@ -297,23 +283,16 @@ OUTPUT: Numbered list of titles only.
             # Create and run agent
             model_name = create_agent_client_func("agent2")
             agent = Agent(name="title_generator", model=model_name, instructions=prompt)
-            runner = Runner()
             
-            result = await runner.run(
-                agent=agent,
-                context_variables={},
-                messages=[{"role": "user", "content": f"Generate titles for: {request.video_description}"}]
+            result = await Runner.run(
+                agent,
+                f"Generate {request.title_count} titles for: {request.video_description}"
             )
             
             print(f"[DEBUG] Titles result: {result}")
-            print(f"[DEBUG] Messages count: {len(result.messages) if result.messages else 0}")
             
-            if result.messages and len(result.messages) > 0:
-                titles = result.messages[-1].get('content', '')
-                print(f"[DEBUG] Titles content length: {len(titles)}")
-            else:
-                print("[ERROR] No messages in result!")
-                titles = ""
+            titles = result.final_output if hasattr(result, 'final_output') else ""
+            print(f"[DEBUG] Titles content length: {len(titles)}")
             
             # If still empty, provide error message
             if not titles or titles.strip() == "":
@@ -375,23 +354,16 @@ Format as a structured roadmap.
             # Create and run agent
             model_name = create_agent_client_func("agent6")
             agent = Agent(name="roadmap_generator", model=model_name, instructions=prompt)
-            runner = Runner()
             
-            result = await runner.run(
-                agent=agent,
-                context_variables={},
-                messages=[{"role": "user", "content": "Generate content roadmap"}]
+            result = await Runner.run(
+                agent,
+                f"Create a {request.video_count}-video roadmap for {request.timeframe_days} days"
             )
             
             print(f"[DEBUG] Roadmap result: {result}")
-            print(f"[DEBUG] Messages count: {len(result.messages) if result.messages else 0}")
             
-            if result.messages and len(result.messages) > 0:
-                roadmap = result.messages[-1].get('content', '')
-                print(f"[DEBUG] Roadmap content length: {len(roadmap)}")
-            else:
-                print("[ERROR] No messages in result!")
-                roadmap = ""
+            roadmap = result.final_output if hasattr(result, 'final_output') else ""
+            print(f"[DEBUG] Roadmap content length: {len(roadmap)}")
             
             # If still empty, provide error message
             if not roadmap or roadmap.strip() == "":
