@@ -524,7 +524,7 @@ async def delete_tracked_channel(channel_id: str, user_id: str = "default"):
     """Delete a tracked channel and its analytics data"""
     try:
         # Get MongoDB collection
-        collection = analytics_tracker.channel_collection
+        collection = analytics_tracker.channels_collection
         
         # Delete the channel document
         result = collection.delete_one({
