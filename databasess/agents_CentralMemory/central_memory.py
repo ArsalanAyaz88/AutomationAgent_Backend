@@ -24,61 +24,81 @@ class CentralMemoryDB:
         if mongo_uri is None:
             mongo_uri = os.getenv('CENTRALMEMORY_DATABASE_URL', 'mongodb://localhost:27017')
         
-        # Configure MongoDB client with SSL/TLS settings for Atlas
+        # Store connection params but don't connect yet (lazy connection)
+        self.mongo_uri = mongo_uri
+        self.client = None
+        self.db = None
+        
+        # Collections will be initialized on first use
+        self.global_insights = None
+        self.agent_synchronization = None
+        self.collective_strategies = None
+        self.cross_agent_patterns = None
+        self.performance_leaderboard = None
+        self.shared_experiences = None
+        self.active_agents = None
+        
+        self._connected = False
+        self._connection_attempted = False
+    
+    def _ensure_connection(self):
+        """Establish connection if not already connected (lazy initialization)"""
+        if self._connected or self._connection_attempted:
+            return self._connected
+        
+        self._connection_attempted = True
+        
         try:
             # Check if this is a MongoDB Atlas connection
-            is_atlas = 'mongodb+srv://' in mongo_uri or 'mongodb.net' in mongo_uri
+            is_atlas = 'mongodb+srv://' in self.mongo_uri or 'mongodb.net' in self.mongo_uri
             
             if is_atlas:
                 # Atlas requires SSL/TLS configuration
                 self.client = MongoClient(
-                    mongo_uri,
+                    self.mongo_uri,
                     tls=True,
                     tlsAllowInvalidCertificates=False,
                     tlsCAFile=certifi.where(),
-                    serverSelectionTimeoutMS=5000,
-                    connectTimeoutMS=10000,
-                    socketTimeoutMS=10000,
+                    serverSelectionTimeoutMS=2000,  # Reduced timeout
+                    connectTimeoutMS=5000,
+                    socketTimeoutMS=5000,
                     retryWrites=True,
                     retryReads=True
                 )
             else:
                 # Local MongoDB without SSL
                 self.client = MongoClient(
-                    mongo_uri,
-                    serverSelectionTimeoutMS=5000,
-                    connectTimeoutMS=10000
+                    self.mongo_uri,
+                    serverSelectionTimeoutMS=2000,
+                    connectTimeoutMS=5000
                 )
             
             # Extract database name from URI or use default  
-            if 'mongodb+srv://' in mongo_uri or 'mongodb://' in mongo_uri:
-                # For Atlas URIs, use a default database name
-                database = "youtube_agents_central"
-            else:
-                database = "youtube_agents_central"
-                
+            database = "youtube_agents_central"
             self.db = self.client[database]
             
-            # Collections for different types of shared knowledge
+            # Initialize collections
             self.global_insights = self.db["global_insights"]
             self.agent_synchronization = self.db["agent_synchronization"] 
             self.collective_strategies = self.db["collective_strategies"]
             self.cross_agent_patterns = self.db["cross_agent_patterns"]
             self.performance_leaderboard = self.db["performance_leaderboard"]
             self.shared_experiences = self.db["shared_experiences"]
-            
-            # Active agents registry
             self.active_agents = self.db["active_agents"]
             
             # Create indexes with error handling
             self._create_indexes()
             
+            self._connected = True
+            print("✅ MongoDB Central Memory connected successfully")
+            return True
+            
         except Exception as e:
-            print(f"⚠️  Warning: MongoDB Central Memory initialization failed: {str(e)}")
-            print(f"   Connection will be retried on first use.")
-            # Set client to None to indicate connection failed
+            print(f"⚠️  Warning: MongoDB Central Memory connection failed: {str(e)}")
+            print(f"   Connection will be retried on next use.")
             self.client = None
             self.db = None
+            return False
         
     def _check_connection(self) -> bool:
         """Check if database connection is available"""
@@ -118,6 +138,7 @@ class CentralMemoryDB:
         
     def register_agent(self, agent_id: str, agent_type: str, capabilities: List[str]) -> str:
         """Register an agent in the central system"""
+        self._ensure_connection()
         if not self._check_connection():
             print(f"⚠️  Cannot register agent {agent_id}: Database connection unavailable")
             return "connection_failed"
@@ -143,6 +164,7 @@ class CentralMemoryDB:
     
     def sync_agent_data(self, agent_id: str, ltm_data: Dict[str, Any]) -> Dict[str, Any]:
         """Sync agent's LTM data with central memory and return global insights"""
+        self._ensure_connection()
         if not self._check_connection():
             print(f"⚠️  Cannot sync agent {agent_id}: Database connection unavailable")
             return {'insights': [], 'strategies': [], 'error': 'connection_failed'}
@@ -272,6 +294,9 @@ class CentralMemoryDB:
     
     def get_relevant_insights_for_agent(self, agent_id: str) -> Dict[str, Any]:
         """Get insights relevant to a specific agent"""
+        self._ensure_connection()
+        if not self._check_connection():
+            return {}
         
         # Get agent's capabilities
         agent_info = self.active_agents.find_one({'agent_id': agent_id})
@@ -462,6 +487,9 @@ class CentralMemoryDB:
     
     def get_global_statistics(self) -> Dict[str, Any]:
         """Get comprehensive global statistics across all agents"""
+        self._ensure_connection()
+        if not self._check_connection():
+            return {'error': 'Database connection unavailable'}
         
         total_agents = self.active_agents.count_documents({'status': 'active'})
         total_insights = self.global_insights.count_documents({})

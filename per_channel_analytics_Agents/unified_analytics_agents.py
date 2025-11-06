@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from agents import Agent, Runner
 
-from analytics_enhanced_agents import (
+from per_channel_analytics_Agents.analytics_enhanced_agents import (
     analytics_context,
     get_channel_context_for_script,
     get_channel_context_for_ideas,

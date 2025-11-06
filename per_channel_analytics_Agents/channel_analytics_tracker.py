@@ -13,10 +13,10 @@ import certifi
 
 try:
     # Try direct API client first (uses YOUTUBE_API_KEY)
-    from youtube_direct_client import YouTubeHttpClient
+    from all_youtube_tools.youtube_direct_client import YouTubeHttpClient
 except ImportError:
     # Fallback to HTTP client (uses YOUTUBE_HTTP_BASE_URL)
-    from youtube_http_client import YouTubeHttpClient
+    from all_youtube_tools.youtube_http_client import YouTubeHttpClient
 from agents import Agent, Runner, set_default_openai_client
 from openai import AsyncOpenAI
 

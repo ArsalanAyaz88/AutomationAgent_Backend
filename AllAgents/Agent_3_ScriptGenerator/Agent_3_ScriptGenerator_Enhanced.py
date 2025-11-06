@@ -12,7 +12,7 @@ from pydantic import BaseModel
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from rl_integration import rl_enhanced
+from agents_ReinforcementLearning.rl_integration import rl_enhanced
 from analytics_enhanced_agents import (
     analytics_context,
     enhance_prompt_with_analytics,

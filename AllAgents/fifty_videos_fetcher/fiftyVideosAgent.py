@@ -13,7 +13,7 @@ import re
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from rl_integration import rl_enhanced
+from agents_ReinforcementLearning.rl_integration import rl_enhanced
 
 
 # Request Models

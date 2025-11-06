@@ -316,8 +316,20 @@ class RLAgentRegistry:
         return self.central_memory.get_global_statistics()
 
 
-# Global registry instance
-rl_registry = RLAgentRegistry()
+# Global registry instance - lazy initialization to avoid blocking on import
+_rl_registry = None
+
+def get_rl_registry():
+    """Get or create the RL registry (lazy initialization)"""
+    global _rl_registry
+    if _rl_registry is None:
+        _rl_registry = RLAgentRegistry()
+    return _rl_registry
+
+# For backward compatibility
+rl_registry = type('LazyRegistry', (), {
+    '__getattr__': lambda self, name: getattr(get_rl_registry(), name)
+})()
 
 
 # Decorator to enhance existing agent functions with RL

@@ -8,7 +8,7 @@ try:
     from youtube_direct_client import YouTubeHttpClient
 except ImportError:
     # Fallback to HTTP client (uses YOUTUBE_HTTP_BASE_URL)
-    from youtube_http_client import YouTubeHttpClient
+    from all_youtube_tools.youtube_http_client import YouTubeHttpClient
 
 _client: YouTubeHttpClient | None = None
 

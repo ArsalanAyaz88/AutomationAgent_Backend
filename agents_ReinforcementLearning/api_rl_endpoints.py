@@ -6,7 +6,7 @@ Provides frontend with RL system status, agent stats, and central memory insight
 from fastapi import APIRouter, HTTPException
 from typing import Dict, List, Any
 from datetime import datetime
-from rl_integration import rl_registry
+from agents_ReinforcementLearning.rl_integration import rl_registry
 from databasess.agents_CentralMemory.central_memory import CentralMemoryDB
 
 router = APIRouter(prefix="/api/rl", tags=["RL System"])

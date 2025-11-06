@@ -7,7 +7,7 @@ import os
 from typing import Dict, Any, Optional
 from datetime import datetime
 from functools import wraps
-from channel_analytics_tracker import ChannelAnalyticsTracker
+from per_channel_analytics_Agents.channel_analytics_tracker import ChannelAnalyticsTracker
 
 
 class AnalyticsContext:

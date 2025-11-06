@@ -21,9 +21,9 @@ from agents import (
     set_default_openai_client,
     set_tracing_disabled,
 )
-from youtube_tools import YOUTUBE_TOOLS
-from channel_analytics_tracker import ChannelAnalyticsTracker
-from unified_analytics_agents import register_unified_analytics_routes
+from all_youtube_tools.youtube_tools import YOUTUBE_TOOLS
+from per_channel_analytics_Agents.channel_analytics_tracker import ChannelAnalyticsTracker
+from per_channel_analytics_Agents.unified_analytics_agents import register_unified_analytics_routes
 
 # Load environment variables
 load_dotenv()
@@ -170,7 +170,7 @@ def create_agent_client(agent_key: str):
 
 
 # Import RL integration system
-from rl_integration import rl_registry, get_rl_system_status
+from agents_ReinforcementLearning.rl_integration import rl_registry, get_rl_system_status
 
 # Import and register all agent routes
 from AllAgents.Agent_1_ChannelAuditor.Agent_1_ChannelAuditor import register_agent1_routes
@@ -191,7 +191,7 @@ register_agent6_routes(app, create_agent_client, YOUTUBE_TOOLS)
 register_fifty_videos_routes(app, create_agent_client, YOUTUBE_TOOLS)
 
 # Register RL System API endpoints
-from api_rl_endpoints import router as rl_router
+from agents_ReinforcementLearning.api_rl_endpoints import router as rl_router
 app.include_router(rl_router)
 
 # Register Unified Analytics-Aware Agent Routes
