@@ -41,8 +41,38 @@ class ChannelAnalyticsTracker:
         self.channels_collection = self.db["tracked_channels"]
         self.analytics_collection = self.db["channel_analytics"]
     
+    def extract_video_id(self, video_url: str) -> Optional[str]:
+        """Extract video ID from various YouTube video URL formats"""
+        # Format 1: youtube.com/watch?v=VIDEO_ID
+        match = re.search(r'[?&]v=([^&]+)', video_url)
+        if match:
+            return match.group(1)
+        
+        # Format 2: youtu.be/VIDEO_ID
+        match = re.search(r'youtu\.be/([^?]+)', video_url)
+        if match:
+            return match.group(1)
+        
+        # Format 3: youtube.com/embed/VIDEO_ID
+        match = re.search(r'youtube\.com/embed/([^?]+)', video_url)
+        if match:
+            return match.group(1)
+        
+        # Format 4: youtube.com/v/VIDEO_ID
+        match = re.search(r'youtube\.com/v/([^?]+)', video_url)
+        if match:
+            return match.group(1)
+        
+        return None
+    
     def extract_channel_id(self, channel_url: str) -> Optional[str]:
-        """Extract channel ID from various YouTube URL formats"""
+        """Extract channel ID from various YouTube URL formats (channels and videos)"""
+        # Check if it's a video URL first
+        video_id = self.extract_video_id(channel_url)
+        if video_id:
+            # Return special marker to indicate we need to fetch channel from video
+            return f"video:{video_id}"
+        
         # Format 1: youtube.com/channel/UC...
         match = re.search(r'youtube\.com/channel/([^/?]+)', channel_url)
         if match:
@@ -67,10 +97,22 @@ class ChannelAnalyticsTracker:
         return None
     
     async def save_channel(self, channel_url: str, user_id: str = "default") -> Dict[str, Any]:
-        """Save channel for tracking"""
+        """Save channel for tracking (supports both channel URLs and video URLs)"""
         channel_id = self.extract_channel_id(channel_url)
         if not channel_id:
-            raise ValueError("Invalid YouTube channel URL")
+            raise ValueError("Invalid YouTube channel or video URL")
+        
+        # Check if we need to get channel ID from video
+        if channel_id.startswith("video:"):
+            video_id = channel_id.replace("video:", "")
+            # Get video details to extract channel ID
+            video_data = await self.youtube_client.get_video_stats(video_id)
+            
+            if not video_data or 'items' not in video_data or len(video_data['items']) == 0:
+                raise ValueError("Video not found or invalid video URL")
+            
+            # Extract channel ID from video data
+            channel_id = video_data['items'][0]['snippet']['channelId']
         
         # Fetch channel data
         channel_data = await self.youtube_client.get_channel(channel_id)
