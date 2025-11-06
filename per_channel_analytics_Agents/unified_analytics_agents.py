@@ -227,9 +227,6 @@ def register_unified_analytics_routes(app, create_agent_client_func, youtube_too
     # SCRIPT DATABASE & HELPERS
     # ============================================
     
-    # Initialize scripts collection
-    scripts_collection = analytics_context.tracker.db["uploaded_scripts"]
-    
     def _sanitize_for_veo(text: str) -> str:
         """Sanitize content for Veo v3 compliance"""
         if not isinstance(text, str):
@@ -710,7 +707,7 @@ Format as a structured roadmap.
                 "file_type": "pdf"
             }
             
-            scripts_collection.insert_one(script_doc)
+            analytics_context.tracker.db["uploaded_scripts"].insert_one(script_doc)
             
             return ScriptResponse(
                 success=True,
@@ -745,7 +742,7 @@ Format as a structured roadmap.
                 "file_type": "text"
             }
             
-            scripts_collection.insert_one(script_doc)
+            analytics_context.tracker.db["uploaded_scripts"].insert_one(script_doc)
             
             return ScriptResponse(
                 success=True,
@@ -764,7 +761,7 @@ Format as a structured roadmap.
         📚 Get all uploaded scripts for user
         """
         try:
-            scripts = list(scripts_collection.find(
+            scripts = list(analytics_context.tracker.db["uploaded_scripts"].find(
                 {"user_id": user_id},
                 {"_id": 0}
             ).sort("uploaded_at", -1))
@@ -785,7 +782,7 @@ Format as a structured roadmap.
         📄 Get specific script by ID
         """
         try:
-            script = scripts_collection.find_one(
+            script = analytics_context.tracker.db["uploaded_scripts"].find_one(
                 {"script_id": script_id, "user_id": user_id},
                 {"_id": 0}
             )
@@ -810,7 +807,7 @@ Format as a structured roadmap.
         🗑️ Delete uploaded script
         """
         try:
-            result = scripts_collection.delete_one({
+            result = analytics_context.tracker.db["uploaded_scripts"].delete_one({
                 "script_id": script_id,
                 "user_id": user_id
             })
@@ -850,7 +847,7 @@ Format as a structured roadmap.
         """
         try:
             # Get script from database
-            script = scripts_collection.find_one(
+            script = analytics_context.tracker.db["uploaded_scripts"].find_one(
                 {"script_id": request.script_id, "user_id": request.user_id},
                 {"_id": 0}
             )
