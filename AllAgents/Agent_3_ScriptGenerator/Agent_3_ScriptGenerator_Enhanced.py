@@ -152,8 +152,9 @@ Generate ONLY the script content. No meta-commentary or production notes.
             )
             
             # Run agent
-            runner = Runner(agent=agent)
+            runner = Runner()
             result = await runner.run(
+                agent=agent,
                 context_variables={},
                 messages=[{
                     "role": "user",

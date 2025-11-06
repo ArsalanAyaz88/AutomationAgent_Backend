@@ -325,9 +325,10 @@ High Engagement Videos:
             Be specific, actionable, and data-driven."""
         )
         
-        runner = Runner(agent=agent, client=openai_client)
+        runner = Runner()
         
         result = await runner.run(
+            agent=agent,
             context_variables={},
             messages=[{
                 "role": "user",

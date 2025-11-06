@@ -138,9 +138,10 @@ OUTPUT: Professional YouTube script with hook, introduction, main content, and c
             # Create and run agent
             model_name = create_agent_client_func("agent3")
             agent = Agent(name="script_generator", model=model_name, instructions=prompt)
-            runner = Runner(agent=agent)
+            runner = Runner()
             
             result = await runner.run(
+                agent=agent,
                 context_variables={},
                 messages=[{"role": "user", "content": f"Generate script: {request.topic}"}]
             )
@@ -214,9 +215,10 @@ Format as a numbered list.
             # Create and run agent
             model_name = create_agent_client_func("agent5")
             agent = Agent(name="video_ideas_generator", model=model_name, instructions=prompt)
-            runner = Runner(agent=agent)
+            runner = Runner()
             
             result = await runner.run(
+                agent=agent,
                 context_variables={},
                 messages=[{"role": "user", "content": "Generate video ideas"}]
             )
@@ -295,9 +297,10 @@ OUTPUT: Numbered list of titles only.
             # Create and run agent
             model_name = create_agent_client_func("agent2")
             agent = Agent(name="title_generator", model=model_name, instructions=prompt)
-            runner = Runner(agent=agent)
+            runner = Runner()
             
             result = await runner.run(
+                agent=agent,
                 context_variables={},
                 messages=[{"role": "user", "content": f"Generate titles for: {request.video_description}"}]
             )
@@ -372,9 +375,10 @@ Format as a structured roadmap.
             # Create and run agent
             model_name = create_agent_client_func("agent6")
             agent = Agent(name="roadmap_generator", model=model_name, instructions=prompt)
-            runner = Runner(agent=agent)
+            runner = Runner()
             
             result = await runner.run(
+                agent=agent,
                 context_variables={},
                 messages=[{"role": "user", "content": "Generate content roadmap"}]
             )
