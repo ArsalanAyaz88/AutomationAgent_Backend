@@ -5,7 +5,7 @@
 python-dotenv>=1.0.0
 
 # Core ML and RL (lightweight)
-numpy>=1.21.0,<1.25.0  # Pin to avoid bloat
+numpy>=1.26.0,<2.0.0  # Python 3.12 compatible with pre-built wheels
 
 # Database connections (essential)
 redis>=4.0.0,<5.0.0
