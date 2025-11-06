@@ -78,6 +78,28 @@ class ScriptToSceneRequest(BaseModel):
     user_query: Optional[str] = "Convert this script into detailed scene-by-scene prompts"
 
 
+class ChatMessage(BaseModel):
+    """Chat message model"""
+    role: str  # 'user' or 'assistant'
+    content: str
+
+
+class ScriptwriterChatRequest(BaseModel):
+    """Request model for scriptwriter chatbot"""
+    message: str
+    session_id: Optional[str] = None  # To identify chat session
+    user_id: Optional[str] = "default"
+    channel_id: Optional[str] = None
+
+
+class SceneWriterChatRequest(BaseModel):
+    """Request model for scene writer chatbot"""
+    message: str
+    session_id: Optional[str] = None  # To identify chat session
+    user_id: Optional[str] = "default"
+    script_context: Optional[str] = None  # If user has uploaded a script
+
+
 class UnifiedResponse(BaseModel):
     success: bool
     result: str
@@ -226,6 +248,66 @@ def register_unified_analytics_routes(app, create_agent_client_func, youtube_too
     # ============================================
     # SCRIPT DATABASE & HELPERS
     # ============================================
+    
+    # Initialize chat history collections with TTL index (24 hours auto-delete)
+    scriptwriter_chat_collection = analytics_context.tracker.db["scriptwriter_chat_history"]
+    scene_writer_chat_collection = analytics_context.tracker.db["scene_writer_chat_history"]
+    
+    # Create TTL indexes (auto-delete after 24 hours)
+    try:
+        scriptwriter_chat_collection.create_index(
+            "created_at", 
+            expireAfterSeconds=86400  # 24 hours = 86400 seconds
+        )
+        scene_writer_chat_collection.create_index(
+            "created_at", 
+            expireAfterSeconds=86400  # 24 hours = 86400 seconds
+        )
+    except Exception as e:
+        print(f"TTL index creation (may already exist): {e}")
+    
+    
+    async def save_chat_message(
+        collection, 
+        session_id: str, 
+        user_id: str, 
+        role: str, 
+        content: str
+    ):
+        """Save chat message to database with TTL"""
+        try:
+            message_doc = {
+                "session_id": session_id,
+                "user_id": user_id,
+                "role": role,
+                "content": content,
+                "created_at": datetime.utcnow()  # TTL index uses this
+            }
+            collection.insert_one(message_doc)
+        except Exception as e:
+            print(f"Error saving chat message: {e}")
+    
+    
+    async def get_chat_history(collection, session_id: str, user_id: str, limit: int = 10) -> List[Dict]:
+        """Retrieve chat history from database (last N messages)"""
+        try:
+            messages = list(collection.find(
+                {"session_id": session_id, "user_id": user_id},
+                {"_id": 0, "role": 1, "content": 1, "created_at": 1}
+            ).sort("created_at", 1).limit(limit))
+            return messages
+        except Exception as e:
+            print(f"Error getting chat history: {e}")
+            return []
+    
+    
+    async def clear_chat_session(collection, session_id: str, user_id: str):
+        """Manually clear chat session (in addition to auto TTL)"""
+        try:
+            collection.delete_many({"session_id": session_id, "user_id": user_id})
+        except Exception as e:
+            print(f"Error clearing chat session: {e}")
+    
     
     def _sanitize_for_veo(text: str) -> str:
         """Sanitize content for Veo v3 compliance"""
@@ -955,7 +1037,370 @@ Now, create a complete scene-by-scene breakdown covering the entire script. Each
     
     
     # ============================================
-    # 7. ANALYTICS STATUS
+    # 7. SCRIPTWRITER CHATBOT (Gemini-like)
+    # ============================================
+    
+    @app.post("/api/unified/scriptwriter-chat", response_model=UnifiedResponse)
+    async def scriptwriter_chatbot(request: ScriptwriterChatRequest):
+        """
+        💬 Scriptwriter Chatbot - Gemini-like Conversational Agent
+        
+        Can do:
+        - General conversation about scriptwriting
+        - Answer questions about YouTube content
+        - Generate scripts when asked
+        - Give tips and suggestions
+        - Understand context from chat history
+        
+        Example prompts:
+        - "Write a script about AI"
+        - "How do I make engaging intros?"
+        - "What's a good hook for tech videos?"
+        """
+        try:
+            # Generate session_id if not provided
+            from bson.objectid import ObjectId
+            session_id = request.session_id or str(ObjectId())
+            
+            # Get channel context if available
+            channel_context = ""
+            channel_info = None
+            if request.channel_id:
+                summary = get_channel_summary(request.channel_id, request.user_id)
+                if summary:
+                    channel_info = summary
+                    channel_context = f"""
+📊 YOUR CHANNEL ANALYTICS:
+- Channel: {summary.get('channel_title', 'N/A')}
+- Subscribers: {summary.get('subscriber_count', 'N/A'):,}
+- Avg Views: {summary.get('avg_views', 'N/A'):,}
+- Top Style: {summary.get('top_style', 'N/A')}
+"""
+            
+            # Get chat history from database
+            chat_history = await get_chat_history(
+                scriptwriter_chat_collection, 
+                session_id, 
+                request.user_id, 
+                limit=10
+            )
+            
+            # Build chat history context
+            history_context = ""
+            if chat_history:
+                history_context = "\n\nCONVERSATION HISTORY:\n"
+                for msg in chat_history:
+                    history_context += f"{msg['role'].upper()}: {msg['content']}\n"
+            
+            # Save user message to database
+            await save_chat_message(
+                scriptwriter_chat_collection,
+                session_id,
+                request.user_id,
+                "user",
+                request.message
+            )
+            
+            # Create chatbot agent with conversational instructions
+            model_name = create_agent_client_func("scriptwriter_chat")
+            
+            agent_instructions = f"""You are "The Storyteller" — a friendly and expert YouTube scriptwriting assistant with Gemini-like conversational abilities.
+
+🎯 YOUR PERSONALITY:
+- Warm, helpful, and encouraging
+- Expert in YouTube content creation
+- Can chat casually or get serious about work
+- Remember context from conversation
+- Understand when user wants to chat vs. get work done
+
+🔧 YOUR CAPABILITIES:
+1. **General Conversation**: Answer questions, give tips, discuss ideas
+2. **Script Writing**: Generate full scripts when asked
+3. **Advice & Tips**: Share best practices for YouTube success
+4. **Analysis**: Review and improve existing scripts
+5. **Brainstorming**: Help develop video ideas
+
+📝 WHEN TO WRITE SCRIPTS:
+Only write full scripts when user explicitly asks:
+- "Write a script about..."
+- "Generate a script for..."
+- "Create a video script on..."
+- "I need a script about..."
+
+Otherwise, engage conversationally and provide guidance.
+
+{channel_context}
+{history_context}
+
+🎬 SCRIPTWRITING GUIDELINES (when asked):
+- Hook in first 15 seconds
+- Clear structure (Hook → Content → CTA)
+- Conversational tone (like talking to a friend)
+- Natural transitions
+- Strong call-to-action
+- Aim for 1500-2000 words for 10-minute video
+
+💡 BEST PRACTICES:
+- Keep sentences short and punchy
+- Use storytelling techniques
+- Address viewer directly ("you")
+- Create curiosity loops
+- End with clear next steps
+
+Current User Message: "{request.message}"
+
+Respond naturally. If they want a script, write it. If they want to chat, chat!"""
+
+            agent = Agent(
+                name="Scriptwriter Chatbot",
+                instructions=agent_instructions,
+                model=model_name,
+            )
+            
+            # Run agent
+            result = await Runner.run(agent, request.message)
+            response_text = result.final_output if hasattr(result, 'final_output') else str(result)
+            
+            # Save assistant response to database
+            await save_chat_message(
+                scriptwriter_chat_collection,
+                session_id,
+                request.user_id,
+                "assistant",
+                response_text
+            )
+            
+            return UnifiedResponse(
+                success=True,
+                result=response_text,
+                analytics_used=bool(request.channel_id),
+                channel_info=channel_info,
+                video_analytics=None
+            )
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")
+    
+    
+    # ============================================
+    # 8. SCENE WRITER CHATBOT (Gemini-like)
+    # ============================================
+    
+    @app.post("/api/unified/scene-writer-chat", response_model=UnifiedResponse)
+    async def scene_writer_chatbot(request: SceneWriterChatRequest):
+        """
+        🎬 Scene Writer Chatbot - Gemini-like Conversational Agent
+        
+        Can do:
+        - General conversation about video production
+        - Answer questions about scene creation
+        - Convert scripts to scenes when asked
+        - Give cinematography tips
+        - Discuss shot types, angles, lighting
+        
+        Example prompts:
+        - "Convert my script to scenes"
+        - "What's a good shot for dramatic moment?"
+        - "Explain wide shots vs close-ups"
+        - "How do I create tension in scenes?"
+        """
+        try:
+            # Generate session_id if not provided
+            from bson.objectid import ObjectId
+            session_id = request.session_id or str(ObjectId())
+            
+            # Build script context if available
+            script_context_text = ""
+            if request.script_context:
+                script_context_text = f"""
+📄 UPLOADED SCRIPT CONTEXT:
+{request.script_context[:500]}...
+(User has a script ready to convert)
+"""
+            
+            # Get chat history from database
+            chat_history = await get_chat_history(
+                scene_writer_chat_collection, 
+                session_id, 
+                request.user_id, 
+                limit=10
+            )
+            
+            # Build chat history context
+            history_context = ""
+            if chat_history:
+                history_context = "\n\nCONVERSATION HISTORY:\n"
+                for msg in chat_history:
+                    history_context += f"{msg['role'].upper()}: {msg['content']}\n"
+            
+            # Save user message to database
+            await save_chat_message(
+                scene_writer_chat_collection,
+                session_id,
+                request.user_id,
+                "user",
+                request.message
+            )
+            
+            # Create chatbot agent
+            model_name = create_agent_client_func("scene_writer_chat")
+            
+            agent_instructions = f"""You are "The Director" — a friendly and expert video scene designer with Gemini-like conversational abilities.
+
+🎯 YOUR PERSONALITY:
+- Friendly cinematography expert
+- Passionate about visual storytelling
+- Can chat casually or dive deep into technical details
+- Remember context from conversation
+- Understand when user wants advice vs. actual scene breakdowns
+
+🔧 YOUR CAPABILITIES:
+1. **General Conversation**: Discuss filmmaking, cinematography, visual storytelling
+2. **Scene Generation**: Convert scripts to detailed 8-second scene breakdowns (JSON format)
+3. **Technical Advice**: Explain shot types, angles, lighting, camera movements
+4. **Creative Guidance**: Help visualize stories cinematically
+5. **Best Practices**: Share Veo v3 compliant video generation tips
+
+📝 WHEN TO GENERATE SCENES:
+Only create full scene breakdowns when user explicitly asks:
+- "Convert to scenes"
+- "Generate scene breakdown"
+- "Break this into scenes"
+- "Create video scenes"
+
+Otherwise, engage conversationally and provide guidance.
+
+{script_context_text}
+{history_context}
+
+🎬 SCENE GENERATION GUIDELINES (when asked):
+- Each scene exactly 8 seconds
+- JSON format with: scene, duration, character, segments, sound, voiceover
+- Shot types: EWS, WS, MS, MCU, CU, ECU
+- Angles: Eye level, High, Low, Dutch, Bird's eye, Worm's eye
+- Movement: Static, Pan, Tilt, Dolly, Tracking, Crane, Handheld
+- Lighting: Three-point, Natural, High key, Low key
+
+🛡️ VEO V3 SAFETY:
+- No graphic violence or gore
+- No sexual content
+- Anonymize real individuals
+- Safe-for-work content only
+- Generic brand descriptions
+
+💡 CINEMATOGRAPHY TIPS:
+- Wide shots establish context
+- Close-ups show emotion
+- Movement adds energy
+- Lighting sets mood
+- Sound enhances immersion
+
+Current User Message: "{request.message}"
+
+Respond naturally. If they want scenes, generate them. If they want to learn, teach!"""
+
+            agent = Agent(
+                name="Scene Writer Chatbot",
+                instructions=agent_instructions,
+                model=model_name,
+            )
+            
+            # Run agent
+            result = await Runner.run(agent, request.message)
+            response_text = result.final_output if hasattr(result, 'final_output') else str(result)
+            
+            # Sanitize for Veo compliance
+            sanitized_response = _sanitize_for_veo(response_text)
+            
+            # Save assistant response to database
+            await save_chat_message(
+                scene_writer_chat_collection,
+                session_id,
+                request.user_id,
+                "assistant",
+                sanitized_response
+            )
+            
+            return UnifiedResponse(
+                success=True,
+                result=sanitized_response,
+                analytics_used=False,
+                channel_info=None,
+                video_analytics=None
+            )
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")
+    
+    
+    # ============================================
+    # 9. CHAT HISTORY MANAGEMENT
+    # ============================================
+    
+    @app.delete("/api/unified/clear-scriptwriter-chat/{session_id}")
+    async def clear_scriptwriter_chat(session_id: str, user_id: str = "default"):
+        """
+        🗑️ Clear Scriptwriter Chat Session
+        Manually delete chat history (in addition to 24-hour auto-delete)
+        """
+        try:
+            await clear_chat_session(scriptwriter_chat_collection, session_id, user_id)
+            return {"success": True, "message": "Chat history cleared"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    @app.delete("/api/unified/clear-scene-writer-chat/{session_id}")
+    async def clear_scene_writer_chat(session_id: str, user_id: str = "default"):
+        """
+        🗑️ Clear Scene Writer Chat Session
+        Manually delete chat history (in addition to 24-hour auto-delete)
+        """
+        try:
+            await clear_chat_session(scene_writer_chat_collection, session_id, user_id)
+            return {"success": True, "message": "Chat history cleared"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    @app.get("/api/unified/get-scriptwriter-chat/{session_id}")
+    async def get_scriptwriter_chat(session_id: str, user_id: str = "default", limit: int = 50):
+        """
+        📜 Get Scriptwriter Chat History
+        Retrieve chat messages for a session
+        """
+        try:
+            messages = await get_chat_history(scriptwriter_chat_collection, session_id, user_id, limit)
+            return {
+                "success": True,
+                "session_id": session_id,
+                "message_count": len(messages),
+                "messages": messages
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    @app.get("/api/unified/get-scene-writer-chat/{session_id}")
+    async def get_scene_writer_chat(session_id: str, user_id: str = "default", limit: int = 50):
+        """
+        📜 Get Scene Writer Chat History
+        Retrieve chat messages for a session
+        """
+        try:
+            messages = await get_chat_history(scene_writer_chat_collection, session_id, user_id, limit)
+            return {
+                "success": True,
+                "session_id": session_id,
+                "message_count": len(messages),
+                "messages": messages
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    # ============================================
+    # 10. ANALYTICS STATUS
     # ============================================
     @app.get("/api/unified/analytics-status")
     async def get_analytics_status(user_id: str = "default"):
