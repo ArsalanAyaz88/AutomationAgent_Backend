@@ -519,6 +519,39 @@ async def get_tracked_channels(user_id: str = "default"):
         raise HTTPException(status_code=500, detail=f"Failed to fetch channels: {str(e)}")
 
 
+@app.delete("/api/channel/tracked/{channel_id}")
+async def delete_tracked_channel(channel_id: str, user_id: str = "default"):
+    """Delete a tracked channel and its analytics data"""
+    try:
+        # Get MongoDB collection
+        collection = analytics_tracker.channel_collection
+        
+        # Delete the channel document
+        result = collection.delete_one({
+            "channel_id": channel_id,
+            "user_id": user_id
+        })
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Channel not found")
+        
+        # Also delete analytics data
+        analytics_collection = analytics_tracker.analytics_collection
+        analytics_collection.delete_many({
+            "channel_id": channel_id,
+            "user_id": user_id
+        })
+        
+        return {
+            "status": "success",
+            "message": f"Channel {channel_id} and its analytics deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete channel: {str(e)}")
+
+
 @app.post("/api/channel/refresh-analytics/{channel_id}")
 async def refresh_channel_analytics(channel_id: str, user_id: str = "default"):
     """Manually refresh analytics for a channel"""
