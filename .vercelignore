@@ -70,3 +70,7 @@ node_modules/
 build/
 dist/
 *.egg-info/
+
+# Force Vercel to use requirements.txt instead of uv.lock
+uv.lock
+pyproject.toml
