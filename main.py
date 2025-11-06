@@ -23,6 +23,7 @@ from agents import (
 )
 from youtube_tools import YOUTUBE_TOOLS
 from channel_analytics_tracker import ChannelAnalyticsTracker
+from unified_analytics_agents import register_unified_analytics_routes
 
 # Load environment variables
 load_dotenv()
@@ -192,6 +193,9 @@ register_fifty_videos_routes(app, create_agent_client, YOUTUBE_TOOLS)
 # Register RL System API endpoints
 from api_rl_endpoints import router as rl_router
 app.include_router(rl_router)
+
+# Register Unified Analytics-Aware Agent Routes
+register_unified_analytics_routes(app, create_agent_client, YOUTUBE_TOOLS)
 
 
 def _ensure_saved_responses_collection():
