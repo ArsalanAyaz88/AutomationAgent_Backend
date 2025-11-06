@@ -41,10 +41,10 @@ class AnalyticsContext:
 📹 Total Videos: {channel['video_count']}
 """
             
-            # Get top performing videos
-            recent_videos = latest_analytics.get('recent_videos', [])[:10]
-            top_performing = sorted(recent_videos, key=lambda x: x.get('views', 0), reverse=True)[:3]
-            high_engagement = sorted(recent_videos, key=lambda x: x.get('engagement_rate', 0), reverse=True)[:3]
+            # Get top performing videos (expanded to 30 for better AI context)
+            recent_videos = latest_analytics.get('recent_videos', [])
+            top_performing = sorted(recent_videos, key=lambda x: x.get('views', 0), reverse=True)[:30]
+            high_engagement = sorted(recent_videos, key=lambda x: x.get('engagement_rate', 0), reverse=True)[:30]
             
             context = f"""
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -62,7 +62,7 @@ class AnalyticsContext:
 ├─ Total Recent Views: {latest_analytics['total_recent_views']:,}
 └─ Total Engagement: {latest_analytics['total_recent_likes'] + latest_analytics['total_recent_comments']:,}
 
-🔥 TOP 3 PERFORMING VIDEOS (By Views):
+🔥 TOP 30 PERFORMING VIDEOS (By Views):
 """
             for i, video in enumerate(top_performing, 1):
                 context += f"""
@@ -71,7 +71,8 @@ class AnalyticsContext:
 """
             
             context += f"""
-💎 TOP 3 HIGH ENGAGEMENT VIDEOS:
+
+💎 TOP 30 HIGH ENGAGEMENT VIDEOS:
 """
             for i, video in enumerate(high_engagement, 1):
                 context += f"""

@@ -66,6 +66,7 @@ class UnifiedResponse(BaseModel):
     error: Optional[str] = None
     analytics_used: bool = False
     channel_info: Optional[Dict[str, Any]] = None
+    video_analytics: Optional[Dict[str, Any]] = None  # Top 30 videos data for frontend display
 
 
 # ============================================
@@ -94,6 +95,68 @@ def register_unified_analytics_routes(app, create_agent_client_func, youtube_too
         summary = get_channel_summary(channel_id, request.user_id)
         
         return channel_id, True, summary
+    
+    
+    async def get_video_analytics_data(channel_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get detailed video analytics for frontend display"""
+        try:
+            # Get latest analytics from MongoDB
+            analytics = analytics_context.tracker.analytics_collection.find_one(
+                {"channel_id": channel_id, "user_id": user_id},
+                sort=[("timestamp", -1)]
+            )
+            
+            if not analytics:
+                return None
+            
+            recent_videos = analytics.get('recent_videos', [])
+            
+            # Get top 30 by views
+            top_performing = sorted(
+                recent_videos, 
+                key=lambda x: x.get('views', 0), 
+                reverse=True
+            )[:30]
+            
+            # Get top 30 by engagement
+            high_engagement = sorted(
+                recent_videos,
+                key=lambda x: x.get('engagement_rate', 0),
+                reverse=True
+            )[:30]
+            
+            return {
+                "total_videos_analyzed": len(recent_videos),
+                "avg_views": analytics.get('avg_views_per_video', 0),
+                "avg_engagement": analytics.get('avg_engagement_rate', 0),
+                "top_performing_videos": [
+                    {
+                        "rank": i + 1,
+                        "title": video['title'],
+                        "views": video['views'],
+                        "likes": video['likes'],
+                        "comments": video['comments'],
+                        "engagement_rate": video['engagement_rate'],
+                        "published_at": video['published_at']
+                    }
+                    for i, video in enumerate(top_performing)
+                ],
+                "high_engagement_videos": [
+                    {
+                        "rank": i + 1,
+                        "title": video['title'],
+                        "views": video['views'],
+                        "likes": video['likes'],
+                        "comments": video['comments'],
+                        "engagement_rate": video['engagement_rate'],
+                        "published_at": video['published_at']
+                    }
+                    for i, video in enumerate(high_engagement)
+                ]
+            }
+        except Exception as e:
+            print(f"Error getting video analytics: {e}")
+            return None
     
     
     # ============================================
@@ -249,11 +312,17 @@ OUTPUT: Pure script text only - exactly what should be said in the video, nothin
             if not script or script.strip() == "":
                 script = "⚠️ Failed to generate script. Please try again or check backend logs."
             
+            # Get video analytics data for frontend display
+            video_analytics = None
+            if has_analytics and channel_id:
+                video_analytics = await get_video_analytics_data(channel_id, request.user_id)
+            
             return UnifiedResponse(
                 success=True,
                 result=script,
                 analytics_used=has_analytics,
-                channel_info=channel_info
+                channel_info=channel_info,
+                video_analytics=video_analytics
             )
             
         except Exception as e:
@@ -319,11 +388,17 @@ Format as a numbered list.
             if not ideas or ideas.strip() == "":
                 ideas = "⚠️ Failed to generate ideas. Please try again or check backend logs."
             
+            # Get video analytics data for frontend display
+            video_analytics = None
+            if has_analytics and channel_id:
+                video_analytics = await get_video_analytics_data(channel_id, request.user_id)
+            
             return UnifiedResponse(
                 success=True,
                 result=ideas,
                 analytics_used=has_analytics,
-                channel_info=channel_info
+                channel_info=channel_info,
+                video_analytics=video_analytics
             )
             
         except Exception as e:
@@ -394,11 +469,17 @@ OUTPUT: Numbered list of titles only.
             if not titles or titles.strip() == "":
                 titles = "⚠️ Failed to generate titles. Please try again or check backend logs."
             
+            # Get video analytics data for frontend display
+            video_analytics = None
+            if has_analytics and channel_id:
+                video_analytics = await get_video_analytics_data(channel_id, request.user_id)
+            
             return UnifiedResponse(
                 success=True,
                 result=titles,
                 analytics_used=has_analytics,
-                channel_info=channel_info
+                channel_info=channel_info,
+                video_analytics=video_analytics
             )
             
         except Exception as e:
@@ -465,11 +546,17 @@ Format as a structured roadmap.
             if not roadmap or roadmap.strip() == "":
                 roadmap = "⚠️ Failed to generate roadmap. Please try again or check backend logs."
             
+            # Get video analytics data for frontend display
+            video_analytics = None
+            if has_analytics and channel_id:
+                video_analytics = await get_video_analytics_data(channel_id, request.user_id)
+            
             return UnifiedResponse(
                 success=True,
                 result=roadmap,
                 analytics_used=has_analytics,
-                channel_info=channel_info
+                channel_info=channel_info,
+                video_analytics=video_analytics
             )
             
         except Exception as e:
