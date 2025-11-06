@@ -25,6 +25,7 @@ google-auth-oauthlib>=1.0.0
 
 # OpenAI for agents
 openai>=1.0.0
+openai-agents>=0.4.2
 
 # REMOVED for production to reduce size:
 # - scipy (heavy, not critical)
