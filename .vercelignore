@@ -1,0 +1,72 @@
+# Vercel Ignore File - Exclude unnecessary files from deployment
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# Documentation (not needed in production)
+*.md
+!README.md
+docs/
+readme_files/
+
+# Development files
+.env.example
+.env.local
+.git/
+.gitignore
+
+# Testing and verification files (not needed in production)
+testing_files/
+verify_*.py
+test_*.py
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Large model files (if any)
+*.pkl
+*.h5
+*.pth
+models/
+
+# Node modules (if any)
+node_modules/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
