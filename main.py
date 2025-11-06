@@ -521,30 +521,45 @@ async def get_tracked_channels(user_id: str = "default"):
 
 @app.delete("/api/channel/tracked/{channel_id}")
 async def delete_tracked_channel(channel_id: str, user_id: str = "default"):
-    """Delete a tracked channel and its analytics data"""
+    """Delete a tracked channel and its analytics data
+    
+    Note: channel_id parameter is actually the MongoDB _id, not the YouTube channel ID
+    """
     try:
         # Get MongoDB collection
         collection = analytics_tracker.channels_collection
         
-        # Delete the channel document
-        result = collection.delete_one({
-            "channel_id": channel_id,
-            "user_id": user_id
-        })
+        # First, get the channel to retrieve the actual YouTube channel_id
+        try:
+            channel_doc = collection.find_one({
+                "_id": ObjectId(channel_id),
+                "user_id": user_id
+            })
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid channel ID format")
         
-        if result.deleted_count == 0:
+        if not channel_doc:
             raise HTTPException(status_code=404, detail="Channel not found")
         
-        # Also delete analytics data
-        analytics_collection = analytics_tracker.analytics_collection
-        analytics_collection.delete_many({
-            "channel_id": channel_id,
+        youtube_channel_id = channel_doc.get("channel_id")
+        
+        # Delete the channel document by _id
+        result = collection.delete_one({
+            "_id": ObjectId(channel_id),
             "user_id": user_id
         })
+        
+        # Also delete analytics data using the YouTube channel ID
+        if youtube_channel_id:
+            analytics_collection = analytics_tracker.analytics_collection
+            analytics_collection.delete_many({
+                "channel_id": youtube_channel_id,
+                "user_id": user_id
+            })
         
         return {
             "status": "success",
-            "message": f"Channel {channel_id} and its analytics deleted successfully"
+            "message": f"Channel and its analytics deleted successfully"
         }
     except HTTPException:
         raise
