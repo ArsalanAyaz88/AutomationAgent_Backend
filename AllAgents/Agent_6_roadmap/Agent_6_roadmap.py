@@ -11,8 +11,9 @@ from pydantic import BaseModel
 
 # Request Models
 class RoadmapGenerationRequest(BaseModel):
-    niche: str
+    niche: Optional[str] = None
     winning_data: Optional[str] = ""
+    channel_input: Optional[str] = None
     user_query: Optional[str] = "Create a 30-video roadmap with 3 title variations and 3 thumbnail concepts for each"
 
 
@@ -38,6 +39,23 @@ def register_agent6_routes(app, create_agent_client_func, youtube_tools=None):
             # Reusable strategic framework (base guidelines)
             base_framework = """You're "The Strategist" - architect sustainable YouTube success through intelligent content planning, data-driven decisions, and strategic execution! 🎯📈"""
 
+            channel_focus = ""
+            if request.channel_input:
+                channel_focus = f"""
+CRITICAL CHANNEL CONTEXT:
+- Channel reference provided: {request.channel_input}
+- Use YouTube tools (channels_listVideos, videos_getVideoStats, etc.) to fetch the channel's latest 50 videos and identify top performers (view velocity, CTR proxies, engagement metrics).
+- Extract at least 10 high-performing videos with stats (title, publish date, views, subs if available, growth signals).
+- Base roadmap pillars, themes, and sequencing on proven winners from this channel. Reference the actual videos in your plan (mention titles, performance rationale, how each roadmap video builds on those wins).
+- Infer the channel's niche, audience persona, and content pillars directly from the performance patterns you surface.
+- Produce a concise "Channel Performance Insights" section summarizing the analyzed videos (table encouraged) and an "Inferred Niche & Audience" summary when the niche was not supplied.
+- If tools fail, state the issue briefly and proceed with best-effort strategy, but still note the failure.
+"""
+
+            niche_context = request.niche or "INFER THIS: Analyze the channel's high-performing videos to define the niche, content pillars, and target audience persona."
+            winning_data_context = request.winning_data if request.winning_data else "No manual winning data provided. Derive performance insights from the channel analysis and summarize them explicitly."
+            channel_input_context = request.channel_input or "None provided"
+
             # ========================================
             # PHASE 1: PLANNER AGENT
             # ========================================
@@ -45,12 +63,17 @@ def register_agent6_routes(app, create_agent_client_func, youtube_tools=None):
 
 Your task: Generate a complete 30-video strategic roadmap for the given niche.
 
-Niche: {request.niche}
+Niche Context:
+{niche_context}
 
 Data from Previous Agents (if provided):
-{request.winning_data}
+{winning_data_context}
+
+Channel Input Reference:
+{channel_input_context}
 
 {base_framework}
+{channel_focus}
 
 Create an initial execution plan covering all 30 videos with pillars, sequencing, SEO, titles (3 options), thumbnails (3 concepts), schedule, and metrics."""
 
@@ -58,6 +81,7 @@ Create an initial execution plan covering all 30 videos with pillars, sequencing
                 name="Planner LLM",
                 instructions=planner_instructions,
                 model=model_name,
+                tools=youtube_tools,
             )
 
             planner_result = await Runner.run(
@@ -80,11 +104,13 @@ Create an initial execution plan covering all 30 videos with pillars, sequencing
 7. METRICS: Targets for CTR/AVD and feedback loops included?
 8. SEASONAL/TREND INTEGRATION: Allocated spots and quick-pivot strategy?
 9. CONSISTENCY/QUALITY: Clarity, actionable details, no ambiguities.
-10. ISSUES & RECOMMENDATIONS: List specific problems and how to fix them.
+10. CHANNEL ALIGNMENT: Do roadmap ideas clearly reference and build upon the channel's actual high-performing videos (if channel data was provided)? Are those references accurate and data-backed?
+11. ISSUES & RECOMMENDATIONS: List specific problems and how to fix them.
 
 Original Inputs:
-Niche: {request.niche}
-Winning Data: {request.winning_data}
+Niche Context: {niche_context}
+Winning Data / Insights: {winning_data_context}
+Channel Input: {channel_input_context}
 
 Plan to review:
 {initial_plan}
@@ -95,6 +121,7 @@ Provide constructive critique with actionable feedback."""
                 name="Critic LLM",
                 instructions=critic_instructions,
                 model=model_name,
+                tools=youtube_tools,
             )
 
             critic_result = await Runner.run(
@@ -111,9 +138,12 @@ Provide constructive critique with actionable feedback."""
 {base_framework}
 
 Original Inputs:
-Niche: {request.niche}
-Winning Data:
-{request.winning_data}
+Niche Context:
+{niche_context}
+Winning Data / Insights:
+{winning_data_context}
+Channel Input:
+{channel_input_context}
 
 Your Initial Plan:
 {initial_plan}
@@ -121,12 +151,23 @@ Your Initial Plan:
 Critic's Feedback:
 {critique}
 
-Task: Produce a REFINED, COMPLETE 30-video roadmap that addresses all critic issues. Follow every explicit user directive before defaults. Maintain strategic YouTube-focused tone. Ensure each video includes required elements (phase, pillar, type, titles x3, thumbnails x3, SEO, outline, connections, publishing, metrics, notes). Output only the final polished roadmap."""
+Task: Produce a REFINED, COMPLETE 30-video roadmap that addresses all critic issues. Follow every explicit user directive before defaults. Maintain strategic YouTube-focused tone. Ensure each video includes required elements (phase, pillar, type, titles x3, thumbnails x3, SEO, outline, connections, publishing, metrics, notes).
+
+When channel_input is provided you MUST:
+- Cite specific high-performing videos from the channel (title + performance metrics) when explaining pillars or video ideas.
+- Highlight how each roadmap video is inspired by, remixes, or improves upon proven winners.
+- Include a reference table summarizing the top channel videos used to inform the roadmap (title, publish date, key metrics, what to learn).
+- Present an "Inferred Niche & Audience" summary when the niche was not supplied.
+- Deliver a "Channel Performance Insights" section (table or structured list) that captures the analyzed video metrics and takeaways.
+- Document any tool failures briefly.
+
+Output only the final polished roadmap."""
 
             refined_planner_agent = Agent(
                 name="Refined Planner LLM",
                 instructions=refined_planner_instructions,
                 model=model_name,
+                tools=youtube_tools,
             )
 
             final_result = await Runner.run(
