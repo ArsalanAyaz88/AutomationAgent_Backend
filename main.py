@@ -77,6 +77,17 @@ AGENT_CONFIGS = {
         "api_key": os.getenv("GEMINI_API_KEY"),
         "model": os.getenv("GEMINI_MODEL_NAME"),
     },
+    # Added chatbot configs used by unified_analytics_agents
+    "scriptwriter_chat": {
+        "base_url": os.getenv("GEMINI_BASE_URL"),
+        "api_key": os.getenv("GEMINI_API_KEY"),
+        "model": os.getenv("GEMINI_MODEL_NAME"),
+    },
+    "scene_writer_chat": {
+        "base_url": os.getenv("GEMINI_BASE_URL"),
+        "api_key": os.getenv("GEMINI_API_KEY"),
+        "model": os.getenv("GEMINI_MODEL_NAME"),
+    },
 }
 
 
@@ -182,13 +193,13 @@ from AllAgents.Agent_6_roadmap.Agent_6_roadmap import register_agent6_routes
 from AllAgents.fifty_videos_fetcher.fiftyVideosAgent import register_fifty_videos_routes
 
 # Register all agent routes with the app
-register_agent1_routes(app, create_agent_client, YOUTUBE_TOOLS)
-register_agent2_routes(app, create_agent_client, YOUTUBE_TOOLS)
-register_agent3_routes(app, create_agent_client, YOUTUBE_TOOLS)
-register_agent4_routes(app, create_agent_client, YOUTUBE_TOOLS)
-register_agent5_routes(app, create_agent_client, YOUTUBE_TOOLS)
-register_agent6_routes(app, create_agent_client, YOUTUBE_TOOLS)
-register_fifty_videos_routes(app, create_agent_client, YOUTUBE_TOOLS)
+# register_agent1_routes(app, create_agent_client, YOUTUBE_TOOLS)
+# register_agent2_routes(app, create_agent_client, YOUTUBE_TOOLS)
+# register_agent3_routes(app, create_agent_client, YOUTUBE_TOOLS)
+# register_agent4_routes(app, create_agent_client, YOUTUBE_TOOLS)
+# register_agent5_routes(app, create_agent_client, YOUTUBE_TOOLS)
+# register_agent6_routes(app, create_agent_client, YOUTUBE_TOOLS)
+# register_fifty_videos_routes(app, create_agent_client, YOUTUBE_TOOLS)
 
 # Register RL System API endpoints
 from agents_ReinforcementLearning.api_rl_endpoints import router as rl_router
@@ -196,164 +207,6 @@ app.include_router(rl_router)
 
 # Register Unified Analytics-Aware Agent Routes
 register_unified_analytics_routes(app, create_agent_client, YOUTUBE_TOOLS)
-
-
-def _ensure_saved_responses_collection():
-    global mongo_client, saved_responses_collection
-
-    if saved_responses_collection is not None:
-        return saved_responses_collection
-
-    if not MONGODB_URI:
-        logger.error("MONGODB_URI not set. Saved responses unavailable.")
-        raise HTTPException(status_code=503, detail="Saved responses service unavailable")
-
-    if saved_responses_collection is not None:
-        return saved_responses_collection
-
-    client: Optional[MongoClient] = None
-    try:
-        logger.info(
-            "Initialising MongoDB client for saved responses (db='%s', collection='%s')",
-            MONGODB_DB or "<empty>",
-            SAVED_RESPONSES_COLLECTION or "<empty>"
-        )
-        client_kwargs: Dict[str, Any] = {}
-        ca_file = MONGODB_CA_FILE
-        if not ca_file:
-            uri_lower = MONGODB_URI.lower()
-            if MONGODB_URI.startswith("mongodb+srv://") or "tls=true" in uri_lower or "ssl=true" in uri_lower:
-                ca_file = certifi.where()
-        if ca_file:
-            client_kwargs["tlsCAFile"] = ca_file
-
-        client = MongoClient(MONGODB_URI, **client_kwargs)
-        client.admin.command('ping')
-        mongo_client = client
-        saved_responses_collection = mongo_client[MONGODB_DB][SAVED_RESPONSES_COLLECTION]
-        logger.info("MongoDB connection for saved responses established successfully")
-    except Exception as exc:
-        logger.exception("Failed to initialise MongoDB client: %s", exc)
-        if client:
-            client.close()
-        if mongo_client and mongo_client is not client:
-            mongo_client.close()
-        mongo_client = None
-        saved_responses_collection = None
-
-    if saved_responses_collection is None:
-        logger.error("Saved responses collection unavailable. Check MongoDB configuration.")
-        raise HTTPException(status_code=503, detail="Saved responses service unavailable")
-
-    return saved_responses_collection
-
-
-def _serialize_datetime(dt: Optional[datetime]) -> Optional[str]:
-    if not dt:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc).isoformat()
-
-
-def _serialize_saved_response(doc: Dict[str, Any], include_content: bool = False) -> SavedResponseDetail | SavedResponseSummary:
-    data = {
-        "id": str(doc.get("_id")),
-        "title": doc.get("title", "Untitled Response"),
-        "agent_id": doc.get("agent_id", 0),
-        "agent_name": doc.get("agent_name", ""),
-        "agent_codename": doc.get("agent_codename", ""),
-        "created_at": _serialize_datetime(doc.get("created_at")),
-        "updated_at": _serialize_datetime(doc.get("updated_at")),
-    }
-    if include_content:
-        data["content"] = doc.get("content", "")
-        return SavedResponseDetail(**data)
-    return SavedResponseSummary(**data)
-
-
-def _parse_saved_response_id(response_id: str) -> ObjectId:
-    if not ObjectId.is_valid(response_id):
-        raise HTTPException(status_code=400, detail="Invalid saved response ID")
-    return ObjectId(response_id)
-
-
-@app.get("/api/saved-responses", response_model=List[SavedResponseSummary])
-async def list_saved_responses():
-    collection = _ensure_saved_responses_collection()
-    logger.info("Listing saved responses")
-    try:
-        docs = list(collection.find({}).sort("updated_at", -1))
-        responses = [_serialize_saved_response(doc) for doc in docs]
-        logger.info("Successfully retrieved %d saved responses", len(responses))
-        return responses
-    except Exception as exc:
-        logger.exception("Failed to list saved responses: %s", exc)
-        raise HTTPException(status_code=500, detail="Failed to list saved responses")
-
-
-@app.post("/api/saved-responses", response_model=SavedResponseDetail, status_code=201)
-async def create_saved_response(request: SavedResponseCreate):
-    collection = _ensure_saved_responses_collection()
-    now = datetime.now(timezone.utc)
-    doc = {
-        "title": request.title.strip() or "Untitled Response",
-        "content": request.content,
-        "agent_id": request.agent_id,
-        "agent_name": request.agent_name,
-        "agent_codename": request.agent_codename,
-        "created_at": now,
-        "updated_at": now,
-    }
-    result = collection.insert_one(doc)
-    doc["_id"] = result.inserted_id
-    logger.info("Saved response '%s' (%s)", doc.get("title"), str(result.inserted_id))
-    return _serialize_saved_response(doc, include_content=True)
-
-
-@app.get("/api/saved-responses/{response_id}", response_model=SavedResponseDetail)
-async def get_saved_response(response_id: str):
-    collection = _ensure_saved_responses_collection()
-    oid = _parse_saved_response_id(response_id)
-    doc = collection.find_one({"_id": oid})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Saved response not found")
-    return _serialize_saved_response(doc, include_content=True)
-
-
-@app.put("/api/saved-responses/{response_id}", response_model=SavedResponseDetail)
-async def update_saved_response(response_id: str, request: SavedResponseUpdate):
-    collection = _ensure_saved_responses_collection()
-    oid = _parse_saved_response_id(response_id)
-    doc = collection.find_one({"_id": oid})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Saved response not found")
-
-    update_fields: Dict[str, Any] = {}
-    if request.title is not None:
-        update_fields["title"] = request.title.strip() or "Untitled Response"
-    if request.content is not None:
-        update_fields["content"] = request.content
-    if not update_fields:
-        return _serialize_saved_response(doc, include_content=True)
-
-    update_fields["updated_at"] = datetime.now(timezone.utc)
-    collection.update_one({"_id": oid}, {"$set": update_fields})
-    doc.update(update_fields)
-    logger.info("Updated saved response '%s' (%s)", doc.get("title"), response_id)
-    return _serialize_saved_response(doc, include_content=True)
-
-
-@app.delete("/api/saved-responses/{response_id}", status_code=204)
-async def delete_saved_response(response_id: str):
-    collection = _ensure_saved_responses_collection()
-    oid = _parse_saved_response_id(response_id)
-    result = collection.delete_one({"_id": oid})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Saved response not found")
-    logger.info("Deleted saved response (%s)", response_id)
-    return None
-
 
 
 # Health check endpoint
