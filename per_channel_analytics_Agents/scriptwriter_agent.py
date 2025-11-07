@@ -12,6 +12,7 @@ from agents import (
     set_default_openai_client,
     set_tracing_disabled,
 )
+from databasess.agents_LTM.mongodb_memory import AgentLTM
 
 BASE_URL = os.getenv("GEMINI_BASE_URL") or ""
 API_KEY = os.getenv("GEMINI_API_KEY") or ""
@@ -53,6 +54,25 @@ async def main():
     userinput = input("Enter the topic for the script: ")
     result = await Runner.run(agent, userinput)
     print(result.final_output)
+
+    # Log to Long-Term Memory (agent task history)
+    try:
+        ltm = AgentLTM(agent_id='agent3')
+        ltm.store_high_value_experience({
+            'q_value': 0.0,
+            'reward': 0.0,
+            'action': 'generate_script_cli',
+            'action_type': 'cli_task',
+            'state': {'prompt': userinput},
+            'next_state': {},
+            'context': {
+                'request': {'topic': userinput},
+                'result_preview': (getattr(result, 'final_output', '') or '')[:1000]
+            },
+            'tags': ['cli', 'scriptwriter']
+        })
+    except Exception as e:
+        print(f"[LTM] Warning: failed to log scriptwriter CLI task: {e}")
 
 
 if __name__ == "__main__":

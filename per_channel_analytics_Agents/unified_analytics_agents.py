@@ -21,6 +21,9 @@ from per_channel_analytics_Agents.analytics_enhanced_agents import (
     get_channel_summary
 )
 
+# LTM (Long-Term Memory) for persistent agent task history
+from databasess.agents_LTM.mongodb_memory import AgentLTM
+
 
 # ============================================
 # REQUEST MODELS
@@ -124,6 +127,52 @@ class ScriptResponse(BaseModel):
 
 def register_unified_analytics_routes(app, create_agent_client_func, youtube_tools):
     """Register all unified analytics-aware endpoints"""
+    
+    # -----------------------------
+    # LTM helpers (per-agent cache)
+    # -----------------------------
+    ltm_cache: Dict[str, AgentLTM] = {}
+    
+    def _get_ltm(agent_key: str) -> AgentLTM:
+        if agent_key not in ltm_cache:
+            ltm_cache[agent_key] = AgentLTM(agent_id=agent_key)
+        return ltm_cache[agent_key]
+    
+    async def log_task_to_ltm(
+        agent_key: str,
+        action: str,
+        payload: Dict[str, Any],
+        result_text: str,
+        user_id: str,
+        channel_id: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        analytics_used: bool = False,
+        extra: Optional[Dict[str, Any]] = None,
+    ):
+        """Persist a concise task record into LTM for per-agent history."""
+        try:
+            ltm = _get_ltm(agent_key)
+            experience = {
+                'q_value': payload.get('q_value', 0.0),
+                'reward': payload.get('reward', 0.0),
+                'action': action,
+                'action_type': 'api_task',
+                'state': {
+                    'user_id': user_id,
+                    'channel_id': channel_id,
+                },
+                'next_state': {},
+                'context': {
+                    'request': payload,
+                    'result_preview': (result_text or '')[:1000],
+                    'analytics_used': analytics_used,
+                    **(extra or {})
+                },
+                'tags': tags or []
+            }
+            ltm.store_high_value_experience(experience)
+        except Exception as e:
+            print(f"[LTM] Failed to log {agent_key}/{action}: {e}")
     
     async def get_channel_context(request: AnalyticsAwareRequest) -> tuple[str, bool, Optional[Dict]]:
         """Helper to get analytics context for any request"""
@@ -504,6 +553,19 @@ OUTPUT: Pure script text only - exactly what should be said in the video, nothin
             if not script or script.strip() == "":
                 script = "⚠️ Failed to generate script. Please try again or check backend logs."
             
+            # Log task to LTM
+            await log_task_to_ltm(
+                agent_key='agent3',
+                action='generate_script',
+                payload=request.dict(),
+                result_text=script,
+                user_id=request.user_id,
+                channel_id=channel_id,
+                tags=['script', 'generator'],
+                analytics_used=has_analytics,
+                extra={'channel_info': channel_info}
+            )
+
             # Script generator is topic-based, doesn't analyze specific videos
             # So we don't send video_analytics data
             return UnifiedResponse(
@@ -577,6 +639,19 @@ Format as a numbered list.
             if not ideas or ideas.strip() == "":
                 ideas = "⚠️ Failed to generate ideas. Please try again or check backend logs."
             
+            # Log task to LTM
+            await log_task_to_ltm(
+                agent_key='agent5',
+                action='generate_video_ideas',
+                payload=request.dict(),
+                result_text=ideas,
+                user_id=request.user_id,
+                channel_id=channel_id,
+                tags=['ideas', 'generator'],
+                analytics_used=has_analytics,
+                extra={'channel_info': channel_info}
+            )
+
             # Get video analytics data for frontend display
             video_analytics = None
             if has_analytics and channel_id:
@@ -658,6 +733,19 @@ OUTPUT: Numbered list of titles only.
             if not titles or titles.strip() == "":
                 titles = "⚠️ Failed to generate titles. Please try again or check backend logs."
             
+            # Log task to LTM
+            await log_task_to_ltm(
+                agent_key='agent2',
+                action='generate_titles',
+                payload=request.dict(),
+                result_text=titles,
+                user_id=request.user_id,
+                channel_id=channel_id,
+                tags=['titles', 'generator'],
+                analytics_used=has_analytics,
+                extra={'channel_info': channel_info}
+            )
+
             # Get video analytics data for frontend display
             video_analytics = None
             if has_analytics and channel_id:
@@ -735,6 +823,19 @@ Format as a structured roadmap.
             if not roadmap or roadmap.strip() == "":
                 roadmap = "⚠️ Failed to generate roadmap. Please try again or check backend logs."
             
+            # Log task to LTM
+            await log_task_to_ltm(
+                agent_key='agent6',
+                action='generate_roadmap',
+                payload=request.dict(),
+                result_text=roadmap,
+                user_id=request.user_id,
+                channel_id=channel_id,
+                tags=['roadmap', 'generator'],
+                analytics_used=has_analytics,
+                extra={'channel_info': channel_info}
+            )
+
             # Get video analytics data for frontend display
             video_analytics = None
             if has_analytics and channel_id:
@@ -886,6 +987,23 @@ Respond naturally. If they want a script, write it. If they want to chat, chat!"
                 response_text
             )
             
+            # Log chat turn to LTM
+            await log_task_to_ltm(
+                agent_key='scriptwriter_chat',
+                action='chat_message',
+                payload={
+                    'message': request.message,
+                    'session_id': session_id,
+                    'channel_id': request.channel_id
+                },
+                result_text=response_text,
+                user_id=request.user_id,
+                channel_id=request.channel_id,
+                tags=['chat', 'scriptwriter'],
+                analytics_used=bool(request.channel_id),
+                extra={'session_id': session_id, 'channel_info': channel_info}
+            )
+
             return UnifiedResponse(
                 success=True,
                 result=response_text,
@@ -1037,6 +1155,23 @@ Respond naturally. If they want scenes, generate them. If they want to learn, te
                 sanitized_response
             )
             
+            # Log chat turn to LTM
+            await log_task_to_ltm(
+                agent_key='scene_writer_chat',
+                action='chat_message',
+                payload={
+                    'message': request.message,
+                    'session_id': session_id,
+                    'script_context': request.script_context
+                },
+                result_text=sanitized_response,
+                user_id=request.user_id,
+                channel_id=None,
+                tags=['chat', 'scene_writer'],
+                analytics_used=False,
+                extra={'session_id': session_id}
+            )
+
             return UnifiedResponse(
                 success=True,
                 result=sanitized_response,
@@ -1115,6 +1250,62 @@ Respond naturally. If they want scenes, generate them. If they want to learn, te
             raise HTTPException(status_code=500, detail=str(e))
     
     
+    @app.get("/api/unified/list-scriptwriter-sessions")
+    async def list_scriptwriter_sessions(user_id: str = "default", limit: int = 50):
+        try:
+            pipeline = [
+                {"$match": {"user_id": user_id}},
+                {"$sort": {"created_at": -1}},
+                {"$group": {
+                    "_id": "$session_id",
+                    "last_message": {"$first": "$content"},
+                    "last_role": {"$first": "$role"},
+                    "last_activity": {"$first": "$created_at"}
+                }},
+                {"$sort": {"last_activity": -1}},
+                {"$limit": limit}
+            ]
+            results = list(scriptwriter_chat_collection.aggregate(pipeline))
+            sessions = []
+            for r in results:
+                ts = r.get("last_activity")
+                sessions.append({
+                    "session_id": r.get("_id"),
+                    "last_activity": ts.isoformat() if hasattr(ts, "isoformat") else ts,
+                    "preview": r.get("last_message", "")
+                })
+            return {"success": True, "count": len(sessions), "sessions": sessions}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/unified/list-scene-writer-sessions")
+    async def list_scene_writer_sessions(user_id: str = "default", limit: int = 50):
+        try:
+            pipeline = [
+                {"$match": {"user_id": user_id}},
+                {"$sort": {"created_at": -1}},
+                {"$group": {
+                    "_id": "$session_id",
+                    "last_message": {"$first": "$content"},
+                    "last_role": {"$first": "$role"},
+                    "last_activity": {"$first": "$created_at"}
+                }},
+                {"$sort": {"last_activity": -1}},
+                {"$limit": limit}
+            ]
+            results = list(scene_writer_chat_collection.aggregate(pipeline))
+            sessions = []
+            for r in results:
+                ts = r.get("last_activity")
+                sessions.append({
+                    "session_id": r.get("_id"),
+                    "last_activity": ts.isoformat() if hasattr(ts, "isoformat") else ts,
+                    "preview": r.get("last_message", "")
+                })
+            return {"success": True, "count": len(sessions), "sessions": sessions}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     # ============================================
     # 8. ANALYTICS STATUS
     # ============================================
