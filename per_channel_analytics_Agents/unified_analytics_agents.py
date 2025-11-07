@@ -110,6 +110,7 @@ class UnifiedResponse(BaseModel):
     analytics_used: bool = False
     channel_info: Optional[Dict[str, Any]] = None
     video_analytics: Optional[Dict[str, Any]] = None  # Top 30 videos data for frontend display
+    session_id: Optional[str] = None
 
 
 class ScriptResponse(BaseModel):
@@ -886,11 +887,24 @@ Format as a structured roadmap.
                 summary = get_channel_summary(request.channel_id, request.user_id)
                 if summary:
                     channel_info = summary
+                    # Safe comma formatting for numbers; fallback to string when not numeric
+                    def _fmt_commas(v):
+                        try:
+                            if v is None or v == '':
+                                return 'N/A'
+                            n = float(v)
+                            if n.is_integer():
+                                return f"{int(n):,}"
+                            return f"{n:,.0f}"
+                        except Exception:
+                            return str(v)
+                    subs_str = _fmt_commas(summary.get('subscriber_count'))
+                    avg_views_str = _fmt_commas(summary.get('avg_views'))
                     channel_context = f"""
 📊 YOUR CHANNEL ANALYTICS:
 - Channel: {summary.get('channel_title', 'N/A')}
-- Subscribers: {summary.get('subscriber_count', 'N/A'):,}
-- Avg Views: {summary.get('avg_views', 'N/A'):,}
+- Subscribers: {subs_str}
+- Avg Views: {avg_views_str}
 - Top Style: {summary.get('top_style', 'N/A')}
 """
             
@@ -1009,7 +1023,8 @@ Respond naturally. If they want a script, write it. If they want to chat, chat!"
                 result=response_text,
                 analytics_used=bool(request.channel_id),
                 channel_info=channel_info,
-                video_analytics=None
+                video_analytics=None,
+                session_id=session_id
             )
             
         except Exception as e:
@@ -1177,7 +1192,8 @@ Respond naturally. If they want scenes, generate them. If they want to learn, te
                 result=sanitized_response,
                 analytics_used=False,
                 channel_info=None,
-                video_analytics=None
+                video_analytics=None,
+                session_id=session_id
             )
             
         except Exception as e:
