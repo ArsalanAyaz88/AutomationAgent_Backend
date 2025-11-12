@@ -262,6 +262,8 @@ async def stream_run(req: StreamRunRequest):
         async def event_generator():
             try:
                 result = Runner.run_streamed(agent, input=req.prompt)
+                # Send an early comment to nudge flush in some proxies/clients
+                yield ": keep-alive\n\n"
                 # Optional start event
                 yield "event: start\n" + "data: {}\n\n"
                 async for event in result.stream_events():
@@ -276,7 +278,12 @@ async def stream_run(req: StreamRunRequest):
                 err = str(e).replace("\n", " ")
                 yield f"event: error\ndata: {err}\n\n"
 
-        return StreamingResponse(event_generator(), media_type="text/event-stream")
+        headers = {
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+        return StreamingResponse(event_generator(), media_type="text/event-stream", headers=headers)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Streaming failed: {str(e)}")
 
