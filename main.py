@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any, List
 
 import certifi
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -14,6 +15,7 @@ from pymongo import MongoClient
 from bson import ObjectId
 
 from openai import AsyncOpenAI
+from openai.types.responses import ResponseTextDeltaEvent
 from agents import (
     Agent,
     Runner,
@@ -127,6 +129,35 @@ class SavedResponseUpdate(BaseModel):
     content: Optional[str] = None
 
 
+# Initialize MongoDB client and saved responses collection
+def _ensure_saved_responses_collection():
+    """Ensure MongoDB client and saved responses collection are initialized.
+    Uses env vars: MONGODB_URI, MONGODB_DB, SAVED_RESPONSES_COLLECTION, MONGODB_CA_FILE.
+    Sets globals: mongo_client, saved_responses_collection.
+    """
+    global mongo_client, saved_responses_collection
+    if saved_responses_collection is not None and mongo_client is not None:
+        return
+    if not MONGODB_URI:
+        raise HTTPException(status_code=500, detail="MONGODB_URI not set")
+
+    try:
+        ca_file = MONGODB_CA_FILE or certifi.where()
+        mongo_client = MongoClient(MONGODB_URI, tlsCAFile=ca_file)
+        db = mongo_client[MONGODB_DB]
+        saved_responses_collection = db[SAVED_RESPONSES_COLLECTION]
+        # simple ping to ensure connection works
+        mongo_client.admin.command("ping")
+        logger.info(
+            f"MongoDB connected. DB='{MONGODB_DB}', Collection='{SAVED_RESPONSES_COLLECTION}'"
+        )
+    except Exception as e:
+        # Reset globals on failure
+        mongo_client = None
+        saved_responses_collection = None
+        raise HTTPException(status_code=500, detail=f"Failed to init MongoDB: {str(e)}")
+
+
 # Lifespan context manager
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -207,6 +238,47 @@ app.include_router(rl_router)
 
 # Register Unified Analytics-Aware Agent Routes
 register_unified_analytics_routes(app, create_agent_client, YOUTUBE_TOOLS)
+
+
+# Streaming request model
+class StreamRunRequest(BaseModel):
+    agent_key: str  # e.g., "scriptwriter_chat", "scene_writer_chat", or "agent3"/"agent4"
+    prompt: str
+    agent_name: Optional[str] = "stream_agent"
+    instructions: Optional[str] = "You are a helpful assistant."
+
+
+@app.post("/api/stream/run")
+async def stream_run(req: StreamRunRequest):
+    """Run an agent and stream incremental deltas as Server-Sent Events (SSE)."""
+    try:
+        model_name = create_agent_client(req.agent_key)
+        agent = Agent(
+            name=req.agent_name or "stream_agent",
+            instructions=req.instructions or "You are a helpful assistant.",
+            model=model_name,
+        )
+
+        async def event_generator():
+            try:
+                result = Runner.run_streamed(agent, input=req.prompt)
+                # Optional start event
+                yield "event: start\n" + "data: {}\n\n"
+                async for event in result.stream_events():
+                    if event.type == "raw_response_event" and isinstance(event.data, ResponseTextDeltaEvent):
+                        text = event.data.delta or ""
+                        if text:
+                            yield f"data: {text}\n\n"
+                # Optional end event
+                yield "event: end\n" + "data: {}\n\n"
+            except Exception as e:
+                # Stream an error event
+                err = str(e).replace("\n", " ")
+                yield f"event: error\ndata: {err}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Streaming failed: {str(e)}")
 
 
 # Health check endpoint
