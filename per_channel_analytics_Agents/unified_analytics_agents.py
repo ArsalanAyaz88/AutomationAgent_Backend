@@ -67,6 +67,21 @@ class UnifiedRoadmapRequest(AnalyticsAwareRequest):
     focus_area: Optional[str] = None
 
 
+class StoryPlanRequest(AnalyticsAwareRequest):
+    """Request model for story plan (characters, shapes, outline)"""
+    topic: str
+    total_words: Optional[int] = 1000
+    language: Optional[str] = "english"
+
+
+class StoryGenerateRequest(AnalyticsAwareRequest):
+    """Request model to generate full story from an edited outline"""
+    topic: str
+    total_words: Optional[int] = 1000
+    outline: str
+    language: Optional[str] = "english"
+
+
 class ScriptUploadRequest(BaseModel):
     """Request model for uploading scripts"""
     script_title: str
@@ -850,6 +865,136 @@ Format as a structured roadmap.
                 video_analytics=video_analytics
             )
             
+        except Exception as e:
+            return UnifiedResponse(success=False, result="", error=str(e))
+
+    # ============================================
+    # 5. STORY WRITER (PLAN + GENERATE)
+    # ============================================
+    @app.post("/api/unified/story/plan", response_model=UnifiedResponse)
+    async def unified_story_plan(request: StoryPlanRequest):
+        """
+        Generate a story plan: characters, character shapes/appearances, and a detailed outline.
+        Language defaults to English.
+        """
+        try:
+            channel_id, has_analytics, channel_info = await get_channel_context(request)
+
+            analytics_text = ""
+            if has_analytics and channel_id:
+                # Reuse script context as a guidance signal for tone/length preferences
+                analytics_text = get_channel_context_for_script(channel_id, request.topic, request.user_id)
+
+            prompt = f"""
+{analytics_text}
+
+You are a helpful story planning assistant. Create a plan for a short story in {request.language}.
+Story Topic: {request.topic}
+Target length: {request.total_words} words (final story will be generated later)
+
+TASKS:
+1) Propose 3-6 characters with distinct names and roles.
+2) For each character, provide a concise 'shape/appearance' description (1-2 lines).
+3) Provide a detailed outline with numbered sections (8-15 bullets) covering beginning, middle (conflicts, twists), and ending.
+
+OUTPUT FORMAT (Markdown):
+## Characters
+- Name: <name> — Role: <role>
+
+## Character Shapes
+- <name>: <appearance/shape>
+
+## Outline
+1. <outline point>
+2. <outline point>
+...
+"""
+
+            model_name = create_agent_client_func("agent3")
+            agent = Agent(name="story_planner", model=model_name, instructions=prompt)
+            result = await Runner.run(agent, f"Create a story plan for topic: {request.topic}")
+            plan_text = result.final_output if hasattr(result, 'final_output') else ""
+            if not plan_text or plan_text.strip() == "":
+                plan_text = "⚠️ Failed to generate story plan. Please try again."
+
+            await log_task_to_ltm(
+                agent_key='agent3',
+                action='story_plan',
+                payload=request.dict(),
+                result_text=plan_text,
+                user_id=request.user_id,
+                channel_id=channel_id,
+                tags=['story', 'plan'],
+                analytics_used=has_analytics,
+                extra={'channel_info': channel_info}
+            )
+
+            return UnifiedResponse(
+                success=True,
+                result=plan_text,
+                analytics_used=has_analytics,
+                channel_info=channel_info,
+                video_analytics=None
+            )
+        except Exception as e:
+            return UnifiedResponse(success=False, result="", error=str(e))
+
+    @app.post("/api/unified/story/generate", response_model=UnifiedResponse)
+    async def unified_story_generate(request: StoryGenerateRequest):
+        """
+        Generate a full story in English from a given outline and topic. Honor total_words as a target length.
+        """
+        try:
+            channel_id, has_analytics, channel_info = await get_channel_context(request)
+            analytics_text = ""
+            if has_analytics and channel_id:
+                analytics_text = get_channel_context_for_script(channel_id, request.topic, request.user_id)
+
+            prompt = f"""
+{analytics_text}
+
+You are a skilled fiction writer. Write a complete short story in {request.language} following the user's outline.
+Topic: {request.topic}
+Target Word Count: {request.total_words} WORDS or more (words, not characters)
+
+Strict requirements:
+- Follow the outline structure closely, expanding each point into rich paragraphs.
+- Keep the tone suitable for general audiences; avoid explicit or violent content.
+- Use vivid, cinematic language and coherent pacing.
+- Do not include headings or bullets in the output; produce continuous prose.
+- Avoid meta text or instructions.
+
+User Outline (verbatim):
+"""
+
+            instructions = prompt + "\n" + request.outline
+
+            model_name = create_agent_client_func("agent3")
+            agent = Agent(name="story_generator", model=model_name, instructions=instructions)
+            result = await Runner.run(agent, f"Write the full story based on the outline about: {request.topic}")
+            story_text = result.final_output if hasattr(result, 'final_output') else ""
+            if not story_text or story_text.strip() == "":
+                story_text = "⚠️ Failed to generate story. Please try again."
+
+            await log_task_to_ltm(
+                agent_key='agent3',
+                action='story_generate',
+                payload=request.dict(),
+                result_text=story_text,
+                user_id=request.user_id,
+                channel_id=channel_id,
+                tags=['story', 'generate'],
+                analytics_used=has_analytics,
+                extra={'channel_info': channel_info}
+            )
+
+            return UnifiedResponse(
+                success=True,
+                result=story_text,
+                analytics_used=has_analytics,
+                channel_info=channel_info,
+                video_analytics=None
+            )
         except Exception as e:
             return UnifiedResponse(success=False, result="", error=str(e))
     
